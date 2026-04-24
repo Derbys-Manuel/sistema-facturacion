@@ -16,6 +16,17 @@ class CreditQuota extends Model
 
     protected $keyType = 'string';
 
+    protected $fillable = [
+        'document_type',
+        'number',
+        'date_expiration',
+        'date_paid',
+        'total_to_pay',
+        'total_paid',
+        'is_active',
+        'sale_document_id',
+    ];
+
     protected $casts = [
         'document_type' => DocumentType::class,
         'date_expiration' => 'date',

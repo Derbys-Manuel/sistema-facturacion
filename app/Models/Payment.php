@@ -15,6 +15,16 @@ class Payment extends Model
 
     protected $keyType = 'string';
 
+    protected $fillable = [
+        'document_type',
+        'date',
+        'amount',
+        'note',
+        'sale_document_id',
+        'payment_method_id',
+        'credit_quota_id',
+    ];
+
     protected $casts = [
         'document_type' => DocumentType::class,
         'date' => 'date',

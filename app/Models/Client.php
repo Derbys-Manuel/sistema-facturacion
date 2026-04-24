@@ -16,6 +16,21 @@ class Client extends Model
 
     protected $keyType = 'string';
 
+    protected $fillable = [
+        'name',
+        'last_name',
+        'trade_name',
+        'address',
+        'email',
+        'telephone',
+        'doc_identity_type',
+        'document_number',
+        'is_active',
+        'department_id',
+        'province_id',
+        'district_id',
+    ];
+
     protected $casts = [
         'doc_identity_type' => DocIdentityType::class,
         'is_active' => 'boolean',

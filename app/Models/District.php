@@ -15,6 +15,13 @@ class District extends Model
 
     protected $keyType = 'string';
 
+    protected $fillable = [
+        'description',
+        'code',
+        'is_active',
+        'province_id',
+    ];
+
     protected $casts = [
         'is_active' => 'boolean',
     ];

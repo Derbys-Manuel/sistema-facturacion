@@ -15,6 +15,13 @@ class Province extends Model
 
     protected $keyType = 'string';
 
+    protected $fillable = [
+        'description',
+        'code',
+        'is_active',
+        'department_id',
+    ];
+
     protected $casts = [
         'is_active' => 'boolean',
     ];

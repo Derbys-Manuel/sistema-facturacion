@@ -15,6 +15,23 @@ class Company extends Model
 
     protected $keyType = 'string';
 
+    protected $fillable = [
+        'company_name',
+        'ruc',
+        'urbanization',
+        'address',
+        'cod_local',
+        'sol_user',
+        'sol_pass',
+        'cert_path',
+        'logo_path',
+        'production',
+        'ubigueo',
+        'department_id',
+        'province_id',
+        'district_id',
+    ];
+
     protected $casts = [
         'production' => 'boolean',
     ];

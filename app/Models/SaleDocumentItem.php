@@ -14,6 +14,25 @@ class SaleDocumentItem extends Model
 
     protected $keyType = 'string';
 
+    protected $fillable = [
+        'code',
+        'description',
+        'unit',
+        'quantity',
+        'unit_value',
+        'unit_price',
+        'item_value',
+        'igv_affectation_type',
+        'igv_base_amount',
+        'igv_percent',
+        'igv_amount',
+        'icbper_factor',
+        'icbper_amount',
+        'taxes_total',
+        'is_active',
+        'sale_document_id',
+    ];
+
     protected $casts = [
         'quantity' => 'decimal:2',
         'unit_value' => 'decimal:2',

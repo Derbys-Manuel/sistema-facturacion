@@ -7,6 +7,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PackItem extends Model
 {
+    protected $fillable = [
+        'quantity',
+        'price',
+        'is_active',
+        'pack_id',
+        'product_id',
+    ];
+
     protected $casts = [
         'quantity' => 'integer',
         'price' => 'decimal:2',

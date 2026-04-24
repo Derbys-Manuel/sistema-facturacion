@@ -14,6 +14,12 @@ class Department extends Model
 
     protected $keyType = 'string';
 
+    protected $fillable = [
+        'code',
+        'description',
+        'is_active',
+    ];
+
     protected $casts = [
         'is_active' => 'boolean',
     ];

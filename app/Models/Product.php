@@ -15,6 +15,13 @@ class Product extends Model
 
     protected $keyType = 'string';
 
+    protected $fillable = [
+        'name',
+        'unit',
+        'price',
+        'is_active',
+    ];
+
     protected $casts = [
         'price' => 'decimal:2',
         'is_active' => 'boolean',

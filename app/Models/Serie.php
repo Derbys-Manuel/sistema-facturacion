@@ -14,6 +14,14 @@ class Serie extends Model
 
     protected $keyType = 'string';
 
+    protected $fillable = [
+        'document_type',
+        'description',
+        'code',
+        'correlative',
+        'is_active',
+    ];
+
     protected $casts = [
         'document_type' => DocumentType::class,
         'is_active' => 'boolean',
