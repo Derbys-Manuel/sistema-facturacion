@@ -8,5 +8,8 @@ test('home redirects to the dashboard', function () {
 
 test('guests can visit the dashboard', function () {
     $response = $this->get('/dashboard');
-    $response->assertOk();
+
+    $response
+        ->assertOk()
+        ->assertSee('data-flux-sidebar-collapse');
 });
