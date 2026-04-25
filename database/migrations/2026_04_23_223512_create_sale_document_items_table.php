@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use App\Enums\Sunat\AffecType;
 
 return new class extends Migration
 {
@@ -18,7 +19,7 @@ return new class extends Migration
             $table->decimal('unit_value', 12, 2);          
             $table->decimal('unit_price', 12, 2);          
             $table->decimal('item_value', 12, 2);          
-            $table->unsignedSmallInteger('igv_affectation_type'); 
+            $table->enum('igv_affectation_type', AffecType::values()); 
             $table->decimal('igv_base_amount', 12, 2)->default(0); 
             $table->decimal('igv_percent', 5, 2)->default(0);       
             $table->decimal('igv_amount', 12, 2)->default(0);      

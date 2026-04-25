@@ -21,9 +21,9 @@ return new class extends Migration
             $table->string('logo_path')->nullable();
             $table->boolean('production')->default(false);
             $table->string('ubigueo')->nullable(); 
-            $table->foreignUuid('department_id')->constrained('departments');
-            $table->foreignUuid('province_id')->constrained('provinces');
-            $table->foreignUuid('district_id')->constrained('districts');
+            $table->string('department');
+            $table->string('province');
+            $table->string('district');
             $table->timestamps();
         });
     }

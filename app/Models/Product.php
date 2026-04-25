@@ -26,16 +26,4 @@ class Product extends Model
         'price' => 'decimal:2',
         'is_active' => 'boolean',
     ];
-
-    public function packItems(): HasMany
-    {
-        return $this->hasMany(PackItem::class);
-    }
-
-    public function packs(): BelongsToMany
-    {
-        return $this->belongsToMany(Pack::class, 'pack_items')
-            ->withPivot(['id', 'quantity', 'price', 'is_active'])
-            ->withTimestamps();
-    }
 }
