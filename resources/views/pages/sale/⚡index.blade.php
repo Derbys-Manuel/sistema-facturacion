@@ -1,188 +1,325 @@
 <?php
 
 use Livewire\Component;
+use App\Livewire\Forms\BoletaForm;
+use App\Livewire\Forms\BoletaItemForm;
+use App\Livewire\Forms\ClientForm;
+use App\Livewire\Forms\ProductForm;
+use App\Services\SaleCreateService;
 
 new class extends Component
 {
-    //
+    public BoletaForm $sale;
+    public BoletaItemForm $saleItem;
+    public ClientForm $client;
+    public ProductForm $product;
+
+    public string $bolClient = 'hide';
+
+    public array $items = [];
+    public array $products = [];
+    public array $clients = [];
+
+    public ?string $selectedClientLabel = null;
+
+    public function mount(): void
+    {
+        $this->sale->dateIssue = now()->format('d-m-Y H:i:s');
+        $this->sale->dateExpiration = now()->format('d-m-Y H:i:s');
+    }
+
+    public function searchClient(string $q = ''): void
+    {
+        $this->clients = $this->client->search($q);
+    }
+
+    public function searchProduct(string $q = ''): void
+    {
+        $this->products = $this->product->search($q);
+    }
+    public function deletedItem(int $index): void
+    {
+        unset($this->items[$index]);
+        $this->items = array_values($this->items);
+        app(SaleCreateService::class)->applyTotals($this->sale, $this->items);
+    }
+
+    public function selectClient(?string $id = null, ?string $label = null): void
+    {
+        if (blank($id)) {
+            return;
+        }
+        $this->sale->clientId = $id;
+        $this->selectedClientLabel = $label;
+    }
+
+    public function selectProduct(?string $id = null, ?string $label = null): void
+    {
+        if (blank($id)) {
+            return;
+        }
+        $record = $this->product->getRecord($id);
+        if (! $record) {
+            return;
+        }
+        $this->saleItem->description = $record->name;
+        $this->saleItem->code = $record->sku ?? "00000";
+        $this->saleItem->unit = $record->unit;
+        $this->saleItem->quantity = 1;
+        $this->saleItem->unitValue = $record->price ?? 0;
+        $this->saleItem->unitPrice = $record->price ?? 0;
+
+        $saleService = app(SaleCreateService::class);
+        $this->items = $saleService->addItem($this->items, $this->saleItem);
+        $saleService->applyTotals($this->sale, $this->items);
+        $this->saleItem->reset();
+        $this->products = [];
+    }
+
+    public function updatedBolClient($value): void
+    {
+        if ($value === 'hide') {
+            $this->clearClient();
+        }
+    }
+
+    public function clearClient(): void
+    {
+        $this->sale->clientId = null;
+        $this->selectedClientLabel = null;
+        $this->clients = [];
+    }
+    public function resetForm(): void
+    {
+        $this->sale->reset();
+        $this->saleItem->reset();
+
+        $this->items = [];
+        $this->products = [];
+        $this->clients = [];
+
+        $this->bolClient = 'hide';
+
+        $this->sale->dateIssue = now()->format('Y-m-d H:i:s');
+        $this->sale->dateExpiration = now()->format('Y-m-d H:i:s');
+    }
+
+    public function clientCreated(string $id, string $label): void
+    {
+        $this->sale->clientId = $id;
+        $this->selectedClientLabel = $label;
+        $this->bolClient = 'show';
+
+        $this->dispatch('modal-close', name: 'client-create');
+    }
+
+    public function save(): void
+    {
+        $this->sale->items = $this->items;
+        $this->sale->store($this->saleItem);
+        $this->resetForm();
+    }
 };
 ?>
 
-<div class="min-h-screen w-full bg-slate-50 text-slate-900">
-    <div class="flex min-h-screen flex-col">
-        <header class="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur ">
-            <div class="px-6 py-4">
-                <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h1 class="text-lg font-semibold tracking-tight">Ventas</h1>
-                        <p class="text-sm text-slate-500">Listado de documentos de venta</p>
-                    </div>
+<div class="grid gap-4 grid-cols-[4fr_2.5fr] mt-3 h-[82vh]">
+    <section class="flex flex-col overflow-hidden rounded-sm border border-zinc-200 bg-white">
+        <div class="space-y-3 border-b border-zinc-200 p-4">
+            <div class="flex items-center gap-2">
+                <flux:icon.archive-box class="h-4 w-4 text-zinc-700" />
+                <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-800">
+                    Productos
+                </h2>
+            </div>
+            <div class="grid grid-cols-[1fr_auto] gap-2">
+                <x-form.select
+                    wire:key="product-select"
+                    type="backend"
+                    placeholder="Buscar producto..."
+                    search-placeholder="Escribe nombre o unidad..."
+                    icon-left="archive-box"
+                    :clearable="false"
+                    :clear-after-select="true"
+                    :options="$products"
+                    search-action="searchProduct"
+                    select-action="selectProduct"
+                />
+                <flux:modal.trigger name="product-create">
+                    <x-form.button
+                        variant="primary"
+                        size="icon"
+                        type="button"
+                    >
+                        +
+                    </x-form.button>
+                </flux:modal.trigger>
+            </div>
+        </div>
+        <div class="flex-1 overflow-auto p-4">
+            <flux:table>
+                <flux:table.columns>
+                    <flux:table.column>Descripción</flux:table.column>
+                    <flux:table.column>Unidad</flux:table.column>
+                    <flux:table.column>Cantidad</flux:table.column>
+                    <flux:table.column>Precio unit.</flux:table.column>
+                    <flux:table.column>Total</flux:table.column>
+                    <flux:table.column></flux:table.column>
+                </flux:table.columns>
+                @forelse ($items as $index => $item)
+                    <flux:table.row wire:key="item-{{ $index }}">
+                        <flux:table.cell>{{ $item['description'] }}</flux:table.cell>
+                        <flux:table.cell>{{ $item['unit'] }}</flux:table.cell>
+                        <flux:table.cell>{{ $item['quantity'] }}</flux:table.cell>
+                        <flux:table.cell>{{ $item['unitPrice'] }}</flux:table.cell>
+                        <flux:table.cell>{{ $item['total'] }}</flux:table.cell>
+
+                        <flux:table.cell>
+                            <x-form.button
+                                variant="danger"
+                                size="icon"
+                                type="button"
+                                wire:click="deletedItem({{ $index }})"
+                            >
+                                -
+                            </x-form.button>
+                        </flux:table.cell>
+                    </flux:table.row>
+                @empty
+                    <flux:table.row>
+                        <flux:table.cell colspan="6" class="text-center text-zinc-500">
+                            No ha agregado ningún producto
+                        </flux:table.cell>
+                    </flux:table.row>
+                @endforelse
+            </flux:table>
+        </div>
+        <div class="border-t border-zinc-200 px-4 py-3">
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-zinc-500">
+                    Total costo items
+                </span>
+                <div class="rounded-sm border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold tabular-nums">
+                    S/ {{ number_format($sale->total ?? 0, 2) }}
                 </div>
+            </div>
+        </div>
+    </section>
+    <form wire:submit.prevent="save" class="contents">
+        <aside class="flex flex-col overflow-hidden rounded-sm border border-zinc-200 bg-white">
+            <div class="border-b border-zinc-200 px-4 py-4">
+                <div class="flex items-center gap-2">
+                    <flux:icon.document-text class="h-4 w-4 text-zinc-700" />
+                    <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-800">
+                        Datos de boleta
+                    </h2>
+                </div>
+            </div>
+            <div class="flex-1 space-y-4 overflow-auto p-4">
+                <flux:radio.group
+                    wire:model.live="bolClient"
+                    wire:loading.attr="disabled"
+                    wire:target="bolClient"
+                    wire:loading.class="opacity-60 pointer-events-none cursor-wait"
+                    variant="cards"
+                    class="max-sm:flex-col"
+                >
+                    <flux:radio value="show" label="Con cliente" />
+                    <flux:radio value="hide" label="Sin cliente" />
+                </flux:radio.group>
+                <div
+                    x-show="$wire.bolClient === 'show'"
+                    x-cloak
+                    x-transition.opacity.scale.origin.top.duration.150ms
+                    class="grid grid-cols-[1fr_auto] gap-3 items-end"
+                >
+                    <x-form.select
+                        wire:key="client-select-{{ $sale->clientId ?? 'empty' }}"
+                        type="backend"
+                        label="Cliente"
+                        placeholder="Buscar cliente..."
+                        search-placeholder="Escribe nombre o documento..."
+                        icon-left="user"
+                        :clearable="true"
+                        :options="$clients"
+                        :selected-label="$selectedClientLabel"
+                        search-action="searchClient"
+                        select-action="selectClient"
+                        clear-action="clearClient"
+                    />
+                    <flux:modal.trigger name="client-create">
+                        <x-form.button
+                            variant="primary"
+                            size="icon"
+                            type="button"
+                        >
+                            +
+                        </x-form.button>
+                    </flux:modal.trigger>
+                </div>
+                <x-form.input
+                    label="Información adicional"
+                    wire:model="sale.additionalInfo"
+                    placeholder="Ingresa información"
+                    icon-left="hashtag"
+                    :error="$errors->first('sale.additionalInfo')"
+                />
+                <div class="rounded-sm border border-zinc-200 bg-zinc-50 p-4">
+                    <p class="text-xs font-semibold text-zinc-800">
+                        Resumen
+                    </p>
+                    <div class="mt-3 space-y-2 text-xs text-zinc-600">
+                        <div class="flex justify-between">
+                            <span>Total</span>
 
-                <div class="mt-4 flex flex-wrap items-center gap-2">
-                    <div class="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
-                        <span class="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true"></span>
-                        Pendiente
-                        <span class="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-amber-900">S/ 0.00</span>
-                    </div>
-
-                    <div class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200">
-                        <span class="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true"></span>
-                        Pagado
-                        <span class="ml-1 rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-900">S/ 0.00</span>
-                    </div>
-
-                    <div class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200">
-                        <span class="h-2 w-2 rounded-full bg-slate-400" aria-hidden="true"></span>
-                        Total
-                        <span class="ml-1 rounded-full bg-white px-2 py-0.5 text-slate-900">S/ 0.00</span>
+                            <span class="font-semibold text-zinc-900">
+                                S/ {{ number_format($sale->total ?? 0, 2) }}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
-        </header>
-
-        <main class="flex-1 overflow-hidden">
-            <div class="h-full overflow-y-auto px-6 py-6">
-                <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <div class="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div class="flex items-center gap-2">
-                            <span class="inline-flex h-2 w-2 rounded-full bg-slate-400"></span>
-                            <p class="text-sm font-medium text-slate-900">Últimas ventas</p>
-                        </div>
-                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-                                <flux:modal.trigger name="sale-create">
-                                    <flux:button>Nueva venta</flux:button>
-                                </flux:modal.trigger>
-                            </div>
-                            <button type="button" class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm hover:bg-slate-50">Filtros</button>
-                        </div>
-                        
-                    </div>
-
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-slate-200">
-                            <thead class="bg-slate-50">
-                                <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    <th scope="col" class="px-4 py-3">Documento</th>
-                                    <th scope="col" class="px-4 py-3">Cliente</th>
-                                    <th scope="col" class="px-4 py-3">Emisión</th>
-                                    <th scope="col" class="px-4 py-3">Vence</th>
-                                    <th scope="col" class="px-4 py-3">Forma</th>
-                                    <th scope="col" class="px-4 py-3">Estado</th>
-                                    <th scope="col" class="px-4 py-3 text-right">Total</th>
-                                    <th scope="col" class="px-4 py-3">SUNAT</th>
-                                    <th scope="col" class="px-4 py-3 text-right">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-200">
-                                <tr class="hover:bg-slate-50/70">
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-900">F001-00001234</td>
-                                    <td class="px-4 py-3 text-sm text-slate-700">
-                                        <div class="flex flex-col">
-                                            <span class="font-medium text-slate-900">Juan Pérez</span>
-                                            <span class="text-xs text-slate-500">DNI 12345678</span>
-                                        </div>
-                                    </td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-700">24/04/2026</td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-700">24/05/2026</td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-700">Crédito</td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm">
-                                        <span class="inline-flex items-center gap-2 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
-                                            <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
-                                            Pendiente
-                                        </span>
-                                    </td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-slate-900">S/ 1,250.00</td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm">
-                                        <span class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200">
-                                            <span class="h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden="true"></span>
-                                            Por enviar
-                                        </span>
-                                    </td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-right text-sm">
-                                        <div class="inline-flex items-center gap-2">
-                                            <button type="button" class="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50">Ver</button>
-                                            <button type="button" class="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50">Imprimir</button>
-                                        </div>
-                                    </td>
-                                </tr>
-
-                                <tr class="hover:bg-slate-50/70">
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-900">B001-00000077</td>
-                                    <td class="px-4 py-3 text-sm text-slate-700">
-                                        <div class="flex flex-col">
-                                            <span class="font-medium text-slate-900">María López</span>
-                                            <span class="text-xs text-slate-500">RUC 20123456789</span>
-                                        </div>
-                                    </td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-700">24/04/2026</td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-700">24/04/2026</td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-700">Contado</td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm">
-                                        <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200">
-                                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
-                                            Pagado
-                                        </span>
-                                    </td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-slate-900">S/ 180.00</td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm">
-                                        <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200">
-                                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
-                                            Enviado
-                                        </span>
-                                    </td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-right text-sm">
-                                        <div class="inline-flex items-center gap-2">
-                                            <button type="button" class="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50">Ver</button>
-                                            <button type="button" class="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50">Imprimir</button>
-                                        </div>
-                                    </td>
-                                </tr>
-
-                                <tr class="hover:bg-slate-50/70">
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-900">F001-00001235</td>
-                                    <td class="px-4 py-3 text-sm text-slate-700">
-                                        <div class="flex flex-col">
-                                            <span class="font-medium text-slate-900">Comercial Andina SAC</span>
-                                            <span class="text-xs text-slate-500">RUC 20555555555</span>
-                                        </div>
-                                    </td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-700">23/04/2026</td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-700">30/04/2026</td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-700">Crédito</td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm">
-                                        <span class="inline-flex items-center gap-2 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
-                                            <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
-                                            Pendiente
-                                        </span>
-                                    </td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-slate-900">S/ 3,420.50</td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-sm">
-                                        <span class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200">
-                                            <span class="h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden="true"></span>
-                                            Observado
-                                        </span>
-                                    </td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-right text-sm">
-                                        <div class="inline-flex items-center gap-2">
-                                            <button type="button" class="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50">Ver</button>
-                                            <button type="button" class="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50">Imprimir</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+            <div class="border-t border-zinc-200 px-4 py-3">
+                <div class="flex gap-2">
+                    <x-form.button
+                        variant="ghost"
+                        type="button"
+                        class="flex-1"
+                    >
+                        Limpiar
+                    </x-form.button>
+                    <x-form.button
+                        variant="primary"
+                        type="submit"
+                        class="flex-1"
+                        wire:loading.attr="disabled"
+                        wire:target="save"
+                    >
+                        <span wire:loading.remove wire:target="save">
+                            Guardar
+                        </span>
+                        <span wire:loading wire:target="save">
+                            <flux:icon.loading class="size-4 animate-spin" />
+                            Guardando...
+                        </span>
+                    </x-form.button>
                 </div>
             </div>
-        </main>
-    </div>
-
-    <flux:modal 
-        name="sale-create"     
-        style="width: 1400px; height: 90vh; max-width: none; overflow: hidden;"
-        scroll="body" :dismissible="false">
-        <livewire:sale.create />
+        </aside>
+    </form>
+    <flux:modal
+        name="client-create"
+        class="max-w-lg bg-gray-100"
+        scroll="body"
+        :dismissible="false"
+    >
+        <livewire:client.create />
+    </flux:modal>
+    <flux:modal
+        name="product-create"
+        class="max-w-lg bg-gray-100"
+        scroll="body"
+        :dismissible="false"
+    >
+        <livewire:product.create />
     </flux:modal>
 </div>

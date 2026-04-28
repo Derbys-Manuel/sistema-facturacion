@@ -54,7 +54,8 @@ class SaleDocument extends Model
         'date_expiration',
         'additional_info',
         'status',
-        'company_id'
+        'client_id',
+        'company_id',
     ];
 
     protected $casts = [

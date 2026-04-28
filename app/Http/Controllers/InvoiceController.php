@@ -15,7 +15,7 @@ class InvoiceController extends Controller
         $company = $data['company'];
 
         $sunat = new SunatService;
-        $sunat->setTotales($data);
+        // $this->setTotales($data);
         $sunat->setLegends($data);
 
         $see = $sunat->getSee($company);
@@ -37,7 +37,7 @@ class InvoiceController extends Controller
         $company = $data['company'];
 
         $sunat = new SunatService;
-        $sunat->setTotales($data);
+        // $sunat->setTotales($data);
         $sunat->setLegends($data);
 
         $see = $sunat->getSee($company);
@@ -55,7 +55,7 @@ class InvoiceController extends Controller
         $company = $data['company'];
 
         $sunat = new SunatService;
-        $sunat->setTotales($data);
+        // $sunat->setTotales($data);
         $sunat->setLegends($data);
 
         $see = $sunat->getSee($company);

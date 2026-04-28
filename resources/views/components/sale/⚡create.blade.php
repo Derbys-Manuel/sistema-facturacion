@@ -1,36 +1,21 @@
 <?php
 
 use Livewire\Component;
-use App\Livewire\Forms\SaleForm;
-use App\Livewire\Forms\SaleItemForm;
+use App\Livewire\Forms\BoletaForm;
+use App\Livewire\Forms\BoletaItemForm;
 use App\Services\SaleCreateService;
-use App\Enums\Sunat\PaymentForm;
+use App\Models\Client;
 
 new class extends Component
 {
-    public SaleForm $sale;
-    public SaleItemForm $saleItem;
-
+    public BoletaForm $sale;
+    public BoletaItemForm $saleItem;
+    public bool $bolClient = 0;
+    public array $clientList = [];
     public array $items = [];
+    public string $q;
+    public ?string $selectedClientLabel = null;
 
-    public string $skuSearch = '';
-    public string $packSearch = '';
-    public string $clientSearch = '';
-
-    public array $skuOptions = [
-        ['value' => '1', 'label' => 'Producto ejemplo'],
-        ['value' => '2', 'label' => 'Producto 2'],
-    ];
-
-    public array $packOptions = [
-        ['value' => '1', 'label' => 'Pack ejemplo'],
-        ['value' => '2', 'label' => 'Pack premium'],
-    ];
-
-    public array $clientOptions = [
-        ['value' => '1', 'label' => 'Cliente 1'],
-        ['value' => '2', 'label' => 'Cliente 2'],
-    ];
 
     public function mount()
     {
@@ -49,14 +34,44 @@ new class extends Component
         $this->saleItem->reset();
     }
 
-    public function openOption(string $id)
+    public function loadClient($q)
     {
-        // Acción opcional para botón dentro de una opción
+        $this->clientList = Client::query()
+            ->when(
+                filled($q),
+                fn ($query) =>
+                $query->where(
+                    fn ($subQuery) =>
+                    $subQuery->where('name', 'like', "%{$q}%")
+                        ->orWhere('last_name', 'like', "%{$q}%")
+                        ->orWhere('trade_name', 'like', "%{$q}%")
+                        ->orWhere('document_number', 'like', "%{$q}%")
+                )
+            )
+            ->limit(20)
+            ->get()
+            ->map(fn ($client) => [
+            'value' => $client->id,
+            'label' => trim($client->name . ' ' . $client->last_name) . ' - ' . $client->document_number,
+            ])
+            ->toArray();
     }
-
     public function save()
     {
         $this->validate();
+    }
+    public function selectClient(string $id): void
+    {
+        $client = Client::find($id);
+
+        if (!$client) {
+            return;
+        }
+
+        $this->sale->clientId = $client->id;
+
+        $this->selectedClientLabel = trim($client->name . ' ' . $client->last_name)
+            . ' - ' . $client->document_number;
     }
 };
 ?>
@@ -74,18 +89,7 @@ new class extends Component
             </div>
 
             <div class="grid grid-cols-1 gap-3 mt-4">
-                <x-form.searchable-select
-                    label="Producto"
-                    placeholder="Seleccionar producto..."
-                    search-placeholder="Buscar SKU..."
-                    search-model="skuSearch"
-                    value-model="saleItem.skuId"
-                    :options="$skuOptions"
-                    option-button-text="Ver"
-                    option-button-action="openOption"
-                />
-
-
+                
             </div>
         </div>
 
@@ -94,6 +98,7 @@ new class extends Component
                 Aún no agregas items.
             </div>
         </div>
+        
 
         <div class="border-t border-zinc-200 px-4 py-3">
             <div class="flex items-center justify-between">
@@ -110,33 +115,46 @@ new class extends Component
 
     <form wire:submit.prevent="save" class="contents">
         <aside class="rounded-2xl bg-gray-100 shadow-sm flex flex-col overflow-hidden">
-
             <div class="border-b border-zinc-200 px-4 py-4">
                 <div class="flex items-center gap-2">
                     <flux:icon.document-text class="w-4 h-4 text-zinc-700" />
-
                     <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-800">
-                        Datos de documento
+                        Datos de boleta
                     </h2>
                 </div>
             </div>
-
             <div class="flex-1 overflow-auto p-4 space-y-4">
-
-                <div class="grid grid-cols-2 gap-4">
-        
+                <flux:radio.group wire:model="shipping" label="Shipping" variant="cards" class="max-sm:flex-col">
+                    <flux:radio value="standard" label="Con cliente" checked />
+                    <flux:radio value="fast" label="Sin cliente" />
+                </flux:radio.group>
+                <div class="grid grid-cols-2 gap-3">
+                  <x-form.select
+                        label="Cliente"
+                        mode="backend"
+                        placeholder="Seleccionar cliente..."
+                        search-placeholder="Buscar..."
+                        search-model="q"
+                        select-action="selectClient"
+                        :options="$clientList"
+                        :selected-label="$selectedClientLabel"
+                    />
+                    <flux:modal.trigger name="client-create">
+                        <flux:button variant="ghost" type="button" class="flex-1" >
+                            +
+                        </flux:button>
+                    </flux:modal.trigger>
                 </div>
+                <x-input label="Name" wire:model="name" placeholder="Your name" icon="o-user" hint="Your full name" />
 
                 <flux:input
                     label="Nota"
-                    wire:model.live="sale.additionalInfo"
+                    wire:model="sale.additionalInfo"
                 />
-
                 <div class="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
                     <p class="text-xs font-semibold text-zinc-800">
                         Resumen
                     </p>
-
                     <div class="mt-3 space-y-2 text-xs text-zinc-600">
                         <div class="flex justify-between gap-3">
                             <span>Documento</span>

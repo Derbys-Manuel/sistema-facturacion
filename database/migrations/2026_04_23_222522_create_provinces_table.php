@@ -8,18 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('products', function (Blueprint $table) {
+        Schema::create('provinces', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('name');
-            $table->string('unit')->default('NIU');
-            $table->string('sku')->nullable();
-            $table->decimal('price', 12, 2);
+            $table->string('description');
+            $table->string('code')->unique();
             $table->boolean('is_active')->default(true);
+            $table->foreignUuid('department_id')->constrained('departments');
             $table->timestamps();
         });
     }
     public function down(): void
     {
-        Schema::dropIfExists('products');
+        Schema::dropIfExists('provinces');
     }
 };

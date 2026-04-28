@@ -4,10 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Product extends Model
+class Department extends Model
 {
     use HasUuids;
 
@@ -16,15 +15,27 @@ class Product extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
-        'name',
-        'unit',
-        'sku',
-        'price',
+        'code',
+        'description',
         'is_active',
     ];
 
     protected $casts = [
-        'price' => 'decimal:2',
         'is_active' => 'boolean',
     ];
+
+    public function provinces(): HasMany
+    {
+        return $this->hasMany(Province::class);
+    }
+
+    public function clients(): HasMany
+    {
+        return $this->hasMany(Client::class);
+    }
+
+    public function companies(): HasMany
+    {
+        return $this->hasMany(Company::class);
+    }
 }

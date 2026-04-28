@@ -2,29 +2,32 @@
 
 namespace App\Models;
 
+use App\Enums\Sunat\DocIdentityType;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Product extends Model
+class Client extends Model
 {
     use HasUuids;
-
     public $incrementing = false;
 
     protected $keyType = 'string';
 
     protected $fillable = [
         'name',
-        'unit',
-        'sku',
-        'price',
+        'trade_name',
+        'doc_identity_type',
+        'document_number',
+        'address',
         'is_active',
     ];
-
     protected $casts = [
-        'price' => 'decimal:2',
+        'doc_identity_type' => DocIdentityType::class,
         'is_active' => 'boolean',
     ];
+    public function saleDocuments(): HasMany
+    {
+        return $this->hasMany(SaleDocument::class);
+    }
 }

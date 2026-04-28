@@ -25,7 +25,7 @@ return new class extends Migration
             $table->decimal('igv_amount', 12, 2)->default(0);      
             $table->decimal('icbper_factor', 12, 6)->nullable();    
             $table->decimal('icbper_amount', 12, 2)->default(0);    
-            $table->decimal('taxes_total', 12, 2)->default(0);  
+            $table->decimal('total_taxes', 12, 2)->default(0);  
             $table->boolean('is_active')->default(true);
             $table->foreignUuid('sale_document_id')->constrained('sale_documents');
             $table->timestamps();

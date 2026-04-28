@@ -50,9 +50,8 @@ return new class extends Migration
             $table->dateTime('date_expiration');
             $table->text('additional_info')->nullable();
             $table->enum('status', DocumentStatus::values());
-            $table->string('client_name');
-            $table->string('client_number');
-            $table->foreignUuid('company_id')->constrained('companies');
+            $table->foreignUuid('company_id')->nullable()->constrained('companies');
+            $table->foreignUuid('client_id')->nullable()->constrained('clients');
             $table->timestamps();
         });
     }

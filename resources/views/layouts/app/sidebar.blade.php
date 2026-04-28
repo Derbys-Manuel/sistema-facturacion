@@ -16,7 +16,7 @@
                         {{ __('Dashboard') }}
                     </flux:sidebar.item>
                     <flux:sidebar.item icon="layout-grid" :href="route('sales')" :current="request()->routeIs('sales')" wire:navigate>
-                        {{ __('Sales') }}
+                        {{ __('Boletas') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>
