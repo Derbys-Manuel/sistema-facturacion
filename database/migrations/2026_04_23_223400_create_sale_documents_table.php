@@ -4,6 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use App\Enums\DocumentType;
+use App\Enums\DocumentStatus;
 use App\Enums\Sunat\DocSunatType;
 use App\Enums\Sunat\OperationType;
 use App\Enums\Sunat\PaymentForm;
@@ -48,9 +49,9 @@ return new class extends Migration
             $table->dateTime('date_issue');
             $table->dateTime('date_expiration');
             $table->text('additional_info')->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->foreignUuid('company_id')->constrained('companies');
-            $table->foreignUuid('client_id')->constrained('clients');
+            $table->enum('status', DocumentStatus::values());
+            $table->foreignUuid('company_id')->nullable()->constrained('companies');
+            $table->foreignUuid('client_id')->nullable()->constrained('clients');
             $table->timestamps();
         });
     }

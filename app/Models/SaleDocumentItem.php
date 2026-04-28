@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Sunat\AffecType;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -38,7 +39,7 @@ class SaleDocumentItem extends Model
         'unit_value' => 'decimal:2',
         'unit_price' => 'decimal:2',
         'item_value' => 'decimal:2',
-        'igv_affectation_type' => 'integer',
+        'igv_affectation_type' => AffecType::class,
         'igv_base_amount' => 'decimal:2',
         'igv_percent' => 'decimal:2',
         'igv_amount' => 'decimal:2',

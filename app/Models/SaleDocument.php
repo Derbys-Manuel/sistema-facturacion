@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DocumentStatus;
 use App\Enums\DocumentType;
 use App\Enums\Sunat\DocSunatType;
 use App\Enums\Sunat\OperationType;
@@ -52,12 +53,13 @@ class SaleDocument extends Model
         'date_issue',
         'date_expiration',
         'additional_info',
-        'is_active',
-        'company_id',
+        'status',
         'client_id',
+        'company_id',
     ];
 
     protected $casts = [
+        'status' => DocumentStatus::class,
         'document_type' => DocumentType::class,
         'doc_sunat_type' => DocSunatType::class,
         'operation_type' => OperationType::class,
@@ -81,7 +83,6 @@ class SaleDocument extends Model
         'total_sale' => 'decimal:2',
         'rounding' => 'decimal:2',
         'total' => 'decimal:2',
-        'is_active' => 'boolean',
     ];
 
     public function company(): BelongsTo
@@ -89,23 +90,9 @@ class SaleDocument extends Model
         return $this->belongsTo(Company::class);
     }
 
-    public function client(): BelongsTo
-    {
-        return $this->belongsTo(Client::class);
-    }
-
     public function items(): HasMany
     {
         return $this->hasMany(SaleDocumentItem::class);
     }
 
-    public function creditQuotas(): HasMany
-    {
-        return $this->hasMany(CreditQuota::class);
-    }
-
-    public function payments(): HasMany
-    {
-        return $this->hasMany(Payment::class);
-    }
 }

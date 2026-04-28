@@ -27,34 +27,14 @@ class Company extends Model
         'logo_path',
         'production',
         'ubigueo',
-        'department_id',
-        'province_id',
-        'district_id',
+        'department',
+        'province',
+        'district',
     ];
 
     protected $casts = [
         'production' => 'boolean',
     ];
-
-    public function department(): BelongsTo
-    {
-        return $this->belongsTo(Department::class);
-    }
-
-    public function province(): BelongsTo
-    {
-        return $this->belongsTo(Province::class);
-    }
-
-    public function district(): BelongsTo
-    {
-        return $this->belongsTo(District::class);
-    }
-
-    public function paymentMethods(): HasMany
-    {
-        return $this->hasMany(PaymentMethod::class);
-    }
 
     public function saleDocuments(): HasMany
     {
