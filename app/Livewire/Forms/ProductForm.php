@@ -5,7 +5,6 @@ namespace App\Livewire\Forms;
 use Livewire\Attributes\Validate;
 use Livewire\Form;
 use App\Models\Product;
-use Flux\Flux;
 
 
 class ProductForm extends Form
@@ -18,56 +17,42 @@ class ProductForm extends Form
     public ?string $unit = 'NIU';
     #[Validate('nullable|numeric')]
     public ?int $price = null;
-    #[Validate('nullable|numeric')]
+    #[Validate('nullable|string')]
     public ?string $sku = null;
 
-    public function store(){
-        $data = $this->validate();
-        try {
-            Product::create($data);
-            Flux::toast(
-                heading: 'Aviso',
-                text: 'Producto Guardado con exito',
-                variant: 'success',
-                duration: 1000);
-           
-        } catch (\Throwable $th) {
-            Flux::toast(
-                heading: 'Aviso',
-                text: 'Error al guardar producto',
-                variant: 'error',
-                duration: 1000);   
-        }
-    }
-    public function getRecord(string $id){
-        $record = Product::findOrFail($id);
-        return $record;
-    }
-    public function update(): void
+    public function store(): array
     {
-        $data = $this->validate();
-        try {
-            $data->update([
-                'name' => $data['name'],
-                'unit' => $data['unit'],
-                'price' => $data['price'],
-            ]);
-            Flux::toast(
-                heading: 'Aviso',
-                text: 'Producto actualizado con éxito',
-                variant: 'success',
-                duration: 1000
-            );
-        } catch (\Throwable $th) {
-            Flux::toast(
-                heading: 'Aviso',
-                text: 'Error al actualizar producto',
-                variant: 'error',
-                duration: 1000
-            );
-        }
+        $this->validate();
+        $product = Product::create([
+            'name' => $this->name,
+            'unit' => $this->unit,
+            'sku' => $this->sku,
+            'price' => $this->price,
+            'is_active' => true,
+        ]);
+        return $product->toArray();
+    } 
+    public function getRecord(string $id): Product
+    {
+        return Product::findOrFail($id);
     }
-    public function search($q)
+    public function update(): Product
+    {
+        $this->validate();
+
+        $product = Product::findOrFail($this->id);
+
+        $product->update([
+            'name' => $this->name,
+            'unit' => $this->unit,
+            'sku' => $this->sku,
+            'price' => $this->price,
+        ]);
+
+        return $product;
+    }
+
+    public function search(string $q): array
     {
         return Product::query()
             ->when($q,fn ($query) =>

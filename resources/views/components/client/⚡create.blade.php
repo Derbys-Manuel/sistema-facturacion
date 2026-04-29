@@ -3,6 +3,7 @@
 use App\Enums\Sunat\DocIdentityType;
 use App\Livewire\Forms\ClientForm;
 use Livewire\Component;
+use Flux\Flux;
 
 new class extends Component
 {
@@ -51,10 +52,24 @@ new class extends Component
 
     public function save(): void
     {
-        $this->client->store();
-        $this->client->reset();
-
-        $this->dispatch('modal-close', name: 'client-create');
+        try {
+            $client = $this->client->store();
+            $this->client->reset();
+            $this->dispatch('created-client', client: $client);
+            $this->dispatch('modal-close', name: 'client-create');
+            Flux::toast(
+                heading: 'Aviso',
+                text: 'Cliente guardado con éxito',
+                variant: 'success',
+                duration: 1000);                   
+        } catch (\Throwable $th) {
+            report($th);
+            Flux::toast(
+                heading: 'Aviso',
+                text: 'Error al guardar cliente',
+                variant: 'error',
+                duration: 1000);
+        }
     }
 };
 ?>
@@ -79,7 +94,7 @@ new class extends Component
                 label="Tipo doc."
                 type="simple"
                 placeholder="Seleccionar documento..."
-                wire:model.live="client.docIdentityType"
+                wire:model="client.docIdentityType"
                 :options="$docIdentityTypeOptions"
                 :selected-label="collect($docIdentityTypeOptions)->firstWhere('value', $client->docIdentityType)['label'] ?? null"
                 icon-left="identification"
@@ -88,7 +103,7 @@ new class extends Component
 
             <x-form.input
                 label="Número documento"
-                wire:model.live.debounce.300ms="client.documentNumber"
+                wire:model.defer="client.documentNumber"
                 placeholder="Ingresa el número"
                 icon-left="hashtag"
                 :error="$errors->first('client.documentNumber')"
@@ -106,7 +121,7 @@ new class extends Component
         >
             <x-form.input
                 label="Nombre completo"
-                wire:model.live.debounce.300ms="client.name"
+                wire:model.defer="client.name"
                 placeholder="Ingresa el nombre completo"
                 icon-left="user"
                 :error="$errors->first('client.name')"
@@ -120,7 +135,7 @@ new class extends Component
         >
             <x-form.input
                 label="Razón social"
-                wire:model.live.debounce.300ms="client.tradeName"
+                wire:model.defer="client.tradeName"
                 placeholder="Ingresa la razón social"
                 icon-left="building-office"
                 :error="$errors->first('client.tradeName')"
@@ -147,7 +162,7 @@ new class extends Component
                     Guardar cliente
                 </span>
 
-                <span wire:loading wire:target="save" class="inline-flex items-center gap-2">
+                <span wire:loading.flex wire:target="save" class="hidden items-center gap-2">
                     <flux:icon.loading class="size-4 animate-spin" />
                     Guardando...
                 </span>

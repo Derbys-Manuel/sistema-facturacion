@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Forms\ProductForm;
+use Flux\Flux;
 use Livewire\Component;
 
 new class extends Component
@@ -20,28 +21,42 @@ new class extends Component
 
     public function save(): void
     {
-        $this->product->store();
-        $this->product->reset();
+        try {
+            $product = $this->product->store();
+            $this->product->reset();
 
-        $this->dispatch('modal-close', name: 'product-create');
+            $this->dispatch('modal-close', name: 'product-create');
+            $this->dispatch('created-product', product: $product);
+            Flux::toast(
+                heading: 'Aviso',
+                text: 'Producto guardado con éxito',
+                variant: 'success',
+                duration: 1000
+            );
+        } catch (\Throwable $th) {
+            report($th);
+
+            Flux::toast(
+                heading: 'Aviso',
+                text: 'Error al guardar producto',
+                variant: 'error',
+                duration: 1000
+            );
+        }
     }
 };
 ?>
 
 <div x-data class="mx-auto w-full max-w-xl bg-white">
-
     <div class="border-b border-zinc-100 px-5 py-4">
         <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-800">
             Crear producto
         </h2>
-
         <p class="mt-1 text-xs text-zinc-500">
             Registra la información del producto.
         </p>
     </div>
-
     <form wire:submit.prevent="save" class="space-y-4 px-5 py-5">
-
         <x-form.input
             label="Nombre"
             wire:model="product.name"
@@ -68,9 +83,7 @@ new class extends Component
                 :error="$errors->first('product.price')"
             />
         </div>
-
         <div class="flex justify-end gap-2 border-t border-zinc-100 pt-4">
-
             <x-form.button
                 type="button"
                 variant="ghost"
@@ -78,7 +91,6 @@ new class extends Component
             >
                 Cancelar
             </x-form.button>
-
             <x-form.button
                 type="submit"
                 variant="primary"
@@ -88,8 +100,7 @@ new class extends Component
                 <span wire:loading.remove wire:target="save">
                     Guardar producto
                 </span>
-
-                <span wire:loading wire:target="save" class="inline-flex items-center gap-2">
+                <span wire:loading.flex wire:target="save" class="hidden items-center gap-2">
                     <flux:icon.loading class="size-4 animate-spin" />
                     Guardando...
                 </span>

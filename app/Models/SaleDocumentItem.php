@@ -4,10 +4,10 @@ namespace App\Models;
 
 use App\Enums\Sunat\AffecType;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\BaseModel;
 
-class SaleDocumentItem extends Model
+class SaleDocumentItem extends BaseModel
 {
     use HasUuids;
 

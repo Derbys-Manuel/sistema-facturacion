@@ -7,9 +7,10 @@
     'iconLeft' => null,
     'iconRight' => null,
     'disabled' => false,
+    'wrapperClass' => null,
 ])
 
-<div class="w-full">
+<div @class(['w-full', $wrapperClass])>
 
     @if($label)
         <flux:label class="mb-1.5">

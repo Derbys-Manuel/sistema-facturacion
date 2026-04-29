@@ -8,11 +8,11 @@ use App\Enums\Sunat\DocSunatType;
 use App\Enums\Sunat\OperationType;
 use App\Enums\Sunat\PaymentForm;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\BaseModel;
 
-class SaleDocument extends Model
+class SaleDocument extends BaseModel
 {
     use HasUuids;
 
@@ -59,6 +59,7 @@ class SaleDocument extends Model
     ];
 
     protected $casts = [
+        'id'=> 'string',
         'status' => DocumentStatus::class,
         'document_type' => DocumentType::class,
         'doc_sunat_type' => DocSunatType::class,
@@ -90,9 +91,13 @@ class SaleDocument extends Model
         return $this->belongsTo(Company::class);
     }
 
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(SaleDocumentItem::class);
     }
-
 }

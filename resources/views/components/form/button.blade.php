@@ -38,7 +38,7 @@
 
         $variant === 'primary' ? 'bg-primary! text-white! hover:brightness-110!' : '',
         $variant === 'secondary' ? 'bg-zinc-900! text-white! hover:bg-zinc-800!' : '',
-        $variant === 'success' ? 'bg-emerald-600! text-white! hover:bg-emerald-700!' : '',
+        $variant === 'success' ? 'bg-emerald-500! text-white! hover:bg-emerald-600!' : '',
         $variant === 'warning' ? 'bg-amber-500! text-white! hover:bg-amber-600!' : '',
         $variant === 'danger' ? 'bg-red-600! text-white! hover:bg-red-700!' : '',
         $variant === 'link' ? 'bg-transparent! text-primary! underline-offset-4! hover:underline! shadow-none!' : '',
@@ -54,14 +54,14 @@
     {{ $attributes->class($classes) }}
 >
     @if($loading)
-        <flux:icon.loading class="size-4 animate-spin" />
+        <flux:icon.loading variant="micro" class="size-4 animate-spin" />
     @elseif($leftIcon)
-        <flux:icon :name="$leftIcon" class="size-4" />
+        <flux:icon :name="$leftIcon" variant="micro" class="size-4" />
     @endif
 
     {{ $slot }}
 
     @if(!$loading && $rightIcon)
-        <flux:icon :name="$rightIcon" class="size-4" />
+        <flux:icon :name="$rightIcon" variant="micro" class="size-4" />
     @endif
 </flux:button>

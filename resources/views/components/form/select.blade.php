@@ -23,6 +23,7 @@
 @endphp
 
 <div
+    {{ $attributes->whereDoesntStartWith('wire:model')->merge(['class' => 'relative w-full']) }}
     x-data="{
         open: false,
         query: '',
@@ -63,15 +64,16 @@
             this.selectedLabel = label;
             this.query = '';
             this.open = false;
-            this.loading = true;
 
             if (this.hasWireModel) {
                 @if($wireModel->value())
-                    $wire.set('{{ $wireModel->value() }}', value);
+                    $wire.set('{{ $wireModel->value() }}', value, false);
                 @endif
             }
 
             @if($selectAction)
+                this.loading = true;
+
                 $wire.$call('{{ $selectAction }}', value, label)
                     .finally(() => {
                         this.loading = false;
@@ -82,21 +84,19 @@
 
                             if (this.hasWireModel) {
                                 @if($wireModel->value())
-                                    $wire.set('{{ $wireModel->value() }}', null);
+                                    $wire.set('{{ $wireModel->value() }}', null, false);
                                 @endif
                             }
                         }
                     });
             @else
-                this.loading = false;
-
                 if (this.clearAfterSelect) {
                     this.selectedLabel = null;
                     this.query = '';
 
                     if (this.hasWireModel) {
                         @if($wireModel->value())
-                            $wire.set('{{ $wireModel->value() }}', null);
+                            $wire.set('{{ $wireModel->value() }}', null, false);
                         @endif
                     }
                 }
@@ -110,7 +110,7 @@
 
             if (this.hasWireModel) {
                 @if($wireModel->value())
-                    $wire.set('{{ $wireModel->value() }}', null);
+                    $wire.set('{{ $wireModel->value() }}', null, false);
                 @endif
             }
 
@@ -119,7 +119,6 @@
             @endif
         }
     }"
-    class="relative w-full"
 >
     @if($label)
         <flux:label class="mb-1.5">
