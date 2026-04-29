@@ -1,13 +1,10 @@
 <?php
 
 namespace App\Models;
-
+use App\Models\BaseModel;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Product extends Model
+class Product extends BaseModel
 {
     use HasUuids;
 
@@ -25,6 +22,9 @@ class Product extends Model
 
     protected $casts = [
         'price' => 'decimal:2',
+        'name' => 'string',
+        'unit' => 'string',
+        'sku' => 'string',
         'is_active' => 'boolean',
     ];
 }
