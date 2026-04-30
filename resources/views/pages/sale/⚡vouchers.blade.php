@@ -1,156 +1,202 @@
 <?php
 
+use App\Enums\Sunat\DocSunatType;
+use App\Enums\Sunat\OperationType;
+use App\Livewire\Forms\SaleForm;
+use Illuminate\Support\Carbon;
 use Livewire\Component;
+use Livewire\WithPagination;
+use Flux\Flux;
 
 new class extends Component
 {
-    //
+    use WithPagination;
+    public SaleForm $sale;
+    public ?string $from = null;
+    public ?string $to = null;
+    public ?string $q = null;
+    public ?string $docSunatType = null;
+    public ?string $operationType = null;
+    public ?string $companyId = null;
+    public bool $companyReady = false;
+
+    public function setCompany(?string $companyId = null): void
+    {
+        $this->companyId = filled($companyId) ? $companyId : null;
+        $this->companyReady = true;
+        $this->resetPage();
+    }
+
+    private function emptyPaginator(): array
+    {
+        return [
+            'current_page' => 1,
+            'data' => [],
+            'last_page' => 1,
+            'per_page' => 15,
+            'total' => 0,
+        ];
+    }
+
+    public function resetFilters(): void
+    {
+        $this->from = null;
+        $this->to = null;
+        $this->q = null;
+        $this->docSunatType = null;
+        $this->operationType = null;
+
+        $this->resetPage();
+    }
+
+    public function mount(): void
+    {
+        $now = Carbon::now('America/Lima');
+        $this->from = $now->copy()->startOfMonth()->toDateString();
+        $this->to = $now->toDateString();
+    }
+
+    public function updatedFrom(): void { $this->resetPage(); }
+    public function updatedTo(): void { $this->resetPage(); }
+    public function updatedQ(): void { $this->resetPage(); }
+    public function updatedDocSunatType(): void { $this->resetPage(); }
+    public function updatedOperationType(): void { $this->resetPage(); }
+
+    public function getDocumentsProperty(): array
+    {
+        if (! $this->companyReady) {
+            return $this->emptyPaginator();
+        }
+
+        if (blank($this->companyId)) {
+            Flux::toast(
+                heading: 'Alerta',
+                text: 'Debe de seleccionar una empresa',
+                variant: 'warning',
+                duration: 2000
+            );
+
+            return $this->emptyPaginator();
+        }
+
+        return $this->sale->list(
+            from: $this->from,
+            to: $this->to,
+            q: $this->q,
+            docSunatType: $this->docSunatType,
+            operationType: $this->operationType,
+            companyId: $this->companyId,
+        );
+    }
+
+    public function getDocSunatTypeOptionsProperty(): array
+    {
+        return [
+            ['value' => null, 'label' => 'Todos'],
+            ['value' => DocSunatType::BOLETA->value, 'label' => 'Boleta'],
+            ['value' => DocSunatType::FACTURA->value, 'label' => 'Factura'],
+        ];
+    }
+
+    public function getOperationTypeOptionsProperty(): array
+    {
+        return [
+            ['value' => null, 'label' => 'Todos'],
+            ['value' => OperationType::INTERNAL_SALE->value, 'label' => 'Venta interna'],
+        ];
+    }
+
+    public function docSunatTypeLabel(?string $value): string
+    {
+        return match ($value) {
+            DocSunatType::BOLETA->value => 'Boleta',
+            DocSunatType::FACTURA->value => 'Factura',
+            default => $value ?: '-',
+        };
+    }
+
+    public function statusBadgeColor(?string $status): string
+    {
+        return match ($status) {
+            'aprobada' => 'emerald',
+            'rechazada' => 'red',
+            'observada' => 'amber',
+            default => 'zinc',
+        };
+    }
 };
 ?>
-
-@php
-    $records = [
-        [
-            'id' => 'VCH-0001',
-            'type' => 'Boleta',
-            'serie' => 'B001',
-            'correlative' => '00000012',
-            'client' => 'Consumidor final',
-            'total' => 28.50,
-            'status' => 'Aprobado',
-            'issued_at' => '2026-04-28 10:14',
-        ],
-        [
-            'id' => 'VCH-0002',
-            'type' => 'Factura',
-            'serie' => 'F001',
-            'correlative' => '00000003',
-            'client' => 'ACME S.A.C. (20600000001)',
-            'total' => 118.00,
-            'status' => 'Rechazado',
-            'issued_at' => '2026-04-28 12:02',
-        ],
-        [
-            'id' => 'VCH-0003',
-            'type' => 'Boleta',
-            'serie' => 'B001',
-            'correlative' => '00000013',
-            'client' => 'Juan Pérez (12345678)',
-            'total' => 9.90,
-            'status' => 'Borrador',
-            'issued_at' => '2026-04-29 09:40',
-        ],
-    ];
-@endphp
-
-<div
-    class="p-6"
-    x-data="{
-        query: '',
-        status: 'all',
-        type: 'all',
-        selectedId: null,
-        rows: @js($records),
-
-        get filtered() {
-            const q = this.query.trim().toLowerCase();
-
-            return this.rows.filter((row) => {
-                const matchesQuery = !q
-                    || String(row.serie).toLowerCase().includes(q)
-                    || String(row.correlative).toLowerCase().includes(q)
-                    || String(row.client).toLowerCase().includes(q);
-
-                const matchesStatus = this.status === 'all'
-                    || String(row.status).toLowerCase() === String(this.status).toLowerCase();
-
-                const matchesType = this.type === 'all'
-                    || String(row.type).toLowerCase() === String(this.type).toLowerCase();
-
-                return matchesQuery && matchesStatus && matchesType;
-            });
-        },
-
-        badgeClass(status) {
-            const s = String(status).toLowerCase();
-            if (s === 'aprobado') return 'bg-emerald-50 text-emerald-700 ring-emerald-600/20';
-            if (s === 'rechazado') return 'bg-red-50 text-red-700 ring-red-600/20';
-            if (s === 'borrador') return 'bg-zinc-50 text-zinc-700 ring-zinc-600/20';
-            return 'bg-zinc-50 text-zinc-700 ring-zinc-600/20';
-        },
-    }"
->
+<div class="p-6">
+    @php($documents = $this->documents)
     <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-            <h1 class="text-sm font-semibold uppercase tracking-wide text-zinc-800">
-                Comprobantes
-            </h1>
-            <p class="mt-1 text-xs text-zinc-500">
-                Lista local (demo) con filtros instantáneos.
-            </p>
-        </div>
-
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <flux:input
-                x-model="query"
-                placeholder="Buscar por cliente, serie o correlativo..."
-                class="h-10 w-full sm:w-80"
-            />
-
-            <div class="flex gap-2">
-                <select
-                    x-model="type"
-                    class="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-700 shadow-sm"
-                >
-                    <option value="all">Todos</option>
-                    <option value="Boleta">Boleta</option>
-                    <option value="Factura">Factura</option>
-                </select>
-
-                <select
-                    x-model="status"
-                    class="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-700 shadow-sm"
-                >
-                    <option value="all">Estado</option>
-                    <option value="Aprobado">Aprobado</option>
-                    <option value="Rechazado">Rechazado</option>
-                    <option value="Borrador">Borrador</option>
-                </select>
-            </div>
-        </div>
+        <x-sale.vouchers.filters
+            :doc-sunat-type-options="$this->docSunatTypeOptions"
+            :operation-type-options="$this->operationTypeOptions"
+            reset-action="resetFilters"
+        />
     </div>
-
-    <x-ui.table
-        :columns="['Tipo', 'Serie', 'Correlativo', 'Cliente', 'Fecha', 'Total', 'Estado', 'Acciones']"
-        striped
-        selectable
-        x-on:ui-table-selected="selectedId = $event.detail.id"
-    >
-        <template x-for="row in filtered" :key="row.id">
-            <tr
-                class="transition-colors odd:bg-zinc-50/60 hover:bg-zinc-50 cursor-pointer"
-                x-bind:data-row-id="row.id"
-                x-bind:class="selected === row.id ? 'bg-emerald-50' : ''"
-            >
-                <x-ui.table.cell x-text="row.type" />
-                <x-ui.table.cell class="font-mono text-xs" x-text="row.serie" />
-                <x-ui.table.cell class="font-mono text-xs" x-text="row.correlative" />
-                <x-ui.table.cell class="max-w-[28ch] truncate" x-text="row.client" />
-                <x-ui.table.cell class="text-xs text-zinc-500" x-text="row.issued_at" />
-                <x-ui.table.cell class="tabular-nums font-semibold" x-text="`S/ ${Number(row.total).toFixed(2)}`" />
+    <x-ui.table :columns="['Fecha', 'Documento', 'Cliente', 'Tipo', 'Total', 'Estado', 'Acciones']" striped>
+        @forelse ($documents['data'] as $row)
+            <tr class="transition-colors hover:bg-zinc-50 font-mono text-xs" wire:key="sale-document-{{ $row['id'] }}">
                 <x-ui.table.cell>
-                    <span
-                        class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ring-1 ring-inset"
-                        x-bind:class="badgeClass(row.status)"
-                        x-text="row.status"
-                    ></span>
+                    {{ $row['dateIssue'] ? Carbon::parse($row['dateIssue'])->format('d-m-Y H:i') : '-' }}
                 </x-ui.table.cell>
+                <x-ui.table.cell>
+                    {{ ($row['serie'] ?? '-') . '-' . ($row['correlative'] ?? '-') }}
+                </x-ui.table.cell>
+                <x-ui.table.cell class="max-w-[28ch] truncate">
+                    @php($clientName = data_get($row, 'client.tradeName') ?: data_get($row, 'client.name'))
+                    @php($clientDoc = data_get($row, 'client.documentNumber'))
+                    <div class="truncate font-medium text-zinc-800">
+                        {{ $clientName ?: '-' }}
+                    </div>
+                    <div class="mt-0.5 truncate text-xs text-zinc-500 font-mono">
+                        {{ $clientDoc ?: '-' }}
+                    </div>
+                </x-ui.table.cell>
+                <x-ui.table.cell>
+                    {{ $this->docSunatTypeLabel($row['docSunatType'] ?? null) }}
+                </x-ui.table.cell>
+                <x-ui.table.cell class="tabular-nums font-semibold">
+                    S/ {{ number_format((float) ($row['total'] ?? 0), 2) }}
+                </x-ui.table.cell>
+                <x-ui.table.cell>
+                    <flux:tooltip toggleable>
+                        <button type="button" class="inline-flex cursor-pointer">
+                            <flux:badge :color="$this->statusBadgeColor($row['status'] ?? null)">
+                                {{ $row['status'] ?? '-' }}
+                            </flux:badge>
+                        </button>
+                        <flux:tooltip.content class="max-w-[22rem] space-y-2 text-xs">
+                            @php($cdr = data_get($row, 'cdr'))
+                            @if (is_array($cdr) && data_get($cdr, 'success') === true)
+                                <p class="font-semibold text-white">SUNAT: Aceptado</p>
+                                <p class="text-white">
+                                    Código: {{ data_get($cdr, 'cdrResponse.code', '-') }}
+                                </p>
+                                <p class="text-white">
+                                    {{ data_get($cdr, 'cdrResponse.description', '-') }}
+                                </p>
+                            @elseif (is_array($cdr) && data_get($cdr, 'success') === false)
+                                <p class="font-semibold text-white">SUNAT: Rechazado</p>
+                                <p class="text-white">
+                                    Código: {{ data_get($cdr, 'error.code', '-') }}
+                                </p>
+                                <p class="text-white">
+                                    {{ data_get($cdr, 'error.message', '-') }}
+                                </p>
+                            @else
+                                <p class="text-white">Sin respuesta de SUNAT.</p>
+                            @endif
+                        </flux:tooltip.content>
+                    </flux:tooltip>
+                </x-ui.table.cell>
+
                 <x-ui.table.cell>
                     <div class="flex items-center justify-end gap-2">
                         <button
                             type="button"
                             class="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50"
-                            x-on:click.stop="selectedId = row.id"
                         >
                             Ver
                         </button>
@@ -158,40 +204,69 @@ new class extends Component
                         <button
                             type="button"
                             class="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50"
-                            x-on:click.stop="alert(`Acción demo para ${row.serie}-${row.correlative}`)"
                         >
                             Acción
                         </button>
                     </div>
                 </x-ui.table.cell>
             </tr>
-        </template>
-
-        <template x-if="filtered.length === 0">
+        @empty
             <tr>
-                <td colspan="8" class="px-4 py-8 text-center text-sm text-zinc-500">
+                <td colspan="7" class="px-4 py-8 text-center text-sm text-zinc-500">
                     Sin resultados.
                 </td>
             </tr>
-        </template>
+        @endforelse
     </x-ui.table>
-
-    <div class="mt-4 rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
-        <div class="flex items-center justify-between gap-3">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                    Selección
-                </p>
-                <p class="mt-1 text-sm font-semibold text-zinc-800" x-text="selectedId ?? 'Ninguno'"></p>
-            </div>
-
-            <button
+    <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="text-xs text-zinc-500">
+            Página {{ $documents['current_page'] ?? 1 }} de {{ $documents['last_page'] ?? 1 }} ·
+            {{ $documents['total'] ?? 0 }} registros
+        </div>
+        <div class="flex gap-2">
+            <x-form.button
+                variant="ghost"
+                size="sm"
                 type="button"
-                class="rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50"
-                x-on:click="selectedId = null"
+                wire:click="previousPage"
+                :disabled="($documents['current_page'] ?? 1) <= 1"
             >
-                Limpiar
-            </button>
+                Anterior
+            </x-form.button>
+            <x-form.button
+                variant="ghost"
+                size="sm"
+                type="button"
+                wire:click="nextPage"
+                :disabled="($documents['current_page'] ?? 1) >= ($documents['last_page'] ?? 1)"
+            >
+                Siguiente
+            </x-form.button>
         </div>
     </div>
 </div>
+@script
+<script>
+    const root = $wire.$el
+    if (root && ! root.dataset.companySelectorBound) {
+        root.dataset.companySelectorBound = '1'
+
+        const syncCompany = (id) => {
+            const companyId = id ?? localStorage.getItem('company-selector')
+            $wire.$call('setCompany', companyId)
+        }
+
+        syncCompany()
+
+        window.addEventListener('company-selected', (e) => {
+            syncCompany(e?.detail?.id ?? null)
+        })
+
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'company-selector') {
+                syncCompany(e.newValue)
+            }
+        })
+    }
+</script>
+@endscript

@@ -13,7 +13,6 @@ use App\Enums\Sunat\PaymentForm;
 use Illuminate\Support\Facades\DB;
 use App\Services\SunatService;
 use App\Livewire\Forms\SaleItemForm;
-use Flux\Flux;
 
 class SaleForm extends Form
 {
@@ -198,6 +197,52 @@ class SaleForm extends Form
         return [
             'sunat' => $response,
         ];
+    }
+
+    public function list(
+        ?string $from = null,
+        ?string $to = null,
+        ?string $q = null,
+        ?string $docSunatType = null,
+        ?string $operationType = null,
+        ?string $companyId = null,
+    ): array {
+        $q = filled($q) ? trim((string) $q) : null;
+
+        return SaleDocument::query()
+            ->with(['items', 'client', 'company'])
+            ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
+            ->when($from, fn ($query) => $query->whereDate('date_issue', '>=', $from))
+            ->when($to, fn ($query) => $query->whereDate('date_issue', '<=', $to))
+            ->when($docSunatType, fn ($query) => $query->where('doc_sunat_type', $docSunatType))
+            ->when($operationType, fn ($query) => $query->where('operation_type', $operationType))
+            ->when(
+                $q,
+                fn ($query) => $query->where(
+                    fn ($subQuery) => $subQuery
+                        ->whereRaw("(serie || '-' || correlative) ilike ?", ["%{$q}%"])
+                        ->orWhereHas(
+                            'company',
+                            fn ($companyQuery) => $companyQuery->where(
+                                fn ($companySubQuery) => $companySubQuery
+                                    ->where('company_name', 'ilike', "%{$q}%")
+                                    ->orWhere('ruc', 'ilike', "%{$q}%")
+                            )
+                        )
+                        ->orWhereHas(
+                            'client',
+                            fn ($clientQuery) => $clientQuery->where(
+                                fn ($clientSubQuery) => $clientSubQuery
+                                    ->where('trade_name', 'ilike', "%{$q}%")
+                                    ->orWhere('name', 'ilike', "%{$q}%")
+                                    ->orWhere('document_number', 'ilike', "%{$q}%")
+                            )
+                        )
+                )
+            )
+            ->latest('date_issue')
+            ->paginate(15)
+            ->toArray();
     }
 
 }    
