@@ -38,7 +38,7 @@
 
         $variant === 'primary' ? 'bg-primary! text-white! hover:brightness-110!' : '',
         $variant === 'secondary' ? 'bg-zinc-900! text-white! hover:bg-zinc-800!' : '',
-        $variant === 'success' ? 'bg-emerald-500! text-white! hover:bg-emerald-600!' : '',
+        $variant === 'success' ? 'bg-emerald-600! text-white! hover:bg-emerald-600!' : '',
         $variant === 'warning' ? 'bg-amber-500! text-white! hover:bg-amber-600!' : '',
         $variant === 'danger' ? 'bg-red-600! text-white! hover:bg-red-700!' : '',
         $variant === 'link' ? 'bg-transparent! text-primary! underline-offset-4! hover:underline! shadow-none!' : '',

@@ -9,6 +9,8 @@ enum OperationType: string
     case CONSIGNMENT = '1002';       // Consignación
     case SALE_OF_FIXED_ASSETS = '1003';
 
+    case ADVANCE_PAYMENT = '0104';
+
     public static function values(): array
     {
         return array_column(self::cases(), 'value');

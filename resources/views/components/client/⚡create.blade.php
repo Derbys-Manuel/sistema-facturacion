@@ -154,7 +154,7 @@ new class extends Component
 
             <x-form.button
                 type="submit"
-                variant="primary"
+                variant="success"
                 wire:loading.attr="disabled"
                 wire:target="save"
             >

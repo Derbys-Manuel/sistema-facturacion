@@ -35,10 +35,12 @@ class SunatService
             $invoice = $sunat->getInvoice($data, $sale);
             $result = $see->send($invoice);
             $xml = $see->getFactory()->getLastXml();
+            $hash = (new XmlUtils)->getHashSign($xml);
             return [
                 'success' => true,
                 'xml' => $xml,
-                'hash' => (new XmlUtils)->getHashSign($xml),
+                'hash' => $hash,
+                'pdfUrl' => route('sale.pdf', $sale),
                 'sunatResponse' => $sunat->sunatResponse($result),
                 'error' => null,
             ];
@@ -177,7 +179,8 @@ class SunatService
         return $response;
     }
 
-    public function getHtmlReport($invoice){
+    public function getHtmlReport(Invoice $invoice, ?CompanyModels $company = null, ?string $hash = null): string
+    {
         $report = new HtmlReport();
         $resolver = new DefaultTemplateResolver();
         $report->setTemplate($resolver->getTemplate($invoice));
@@ -196,15 +199,14 @@ class SunatService
                 'footer' => '<p>Nro Resolucion: <b>3232323</b></p>'
             ]
         ];
-        return $report->render($invoice, $params);
+        return $report->render($invoice, $this->reportParams($company, $hash));
     }
-    public function generatePdfReport($invoice)
+    public function generatePdfReport(Invoice $invoice, ?CompanyModels $company = null, ?string $hash = null): string
     {
         $htmlReport = new HtmlReport();
         $resolver = new DefaultTemplateResolver();
         $htmlReport->setTemplate($resolver->getTemplate($invoice));
         $report = new PdfReport($htmlReport);
-        // Options: Ver mas en https://wkhtmltopdf.org/usage/wkhtmltopdf.txt
         $report->setOptions( [
             'no-outline',
             'viewport-size' => '1280x1024',
@@ -227,8 +229,38 @@ class SunatService
                 'footer' => '<p>Nro Resolucion: <b>3232323</b></p>'
             ]
         ];
-        $pdf = $report->render($invoice, $params);
-        Storage::put('invoices/' . $invoice->getName() . '.pdf', $pdf);
+        $pdf = $report->render($invoice, $this->reportParams($company, $hash));
+
+        if ($pdf === null) {
+            throw new \RuntimeException('No se pudo generar el PDF. Verifique `WKHTML_PDF_PATH` y que wkhtmltopdf este instalado.');
+        }
+
+        return $pdf;
+        // Storage::put('invoices/' . $invoice->getName() . '.pdf', $pdf);
+    }
+
+    private function reportParams(?CompanyModels $company = null, ?string $hash = null): array
+    {
+        $logo = '';
+
+        if ($company && filled($company->logo_path) && Storage::exists($company->logo_path)) {
+            $logo = Storage::get($company->logo_path);
+        }
+
+        return [
+            'system' => [
+                'logo' => $logo,
+                'hash' => $hash,
+            ],
+            'user' => [
+                'header' => 'Telf: <b>(01) 123375</b>',
+                'extras' => [
+                    ['name' => 'CONDICION DE PAGO', 'value' => 'Efectivo'],
+                    ['name' => 'VENDEDOR', 'value' => 'GITHUB SELLER'],
+                ],
+                'footer' => '<p>Nro Resolucion: <b>3232323</b></p>',
+            ],
+        ];
     }
     public function setLegends(&$data)
     {
