@@ -34,17 +34,25 @@ new class extends Component
     x-data="{
         selected: null,
         storageKey: @js($storageName),
+        selectedLabel: null,
+        selectedRuc: null,
 
         init() {
             this.selected = localStorage.getItem(this.storageKey)
+            this.selectedLabel = localStorage.getItem(`${this.storageKey}:label`)
+            this.selectedRuc = localStorage.getItem(`${this.storageKey}:ruc`)
         },
 
-        select(id) {
+        select(id, label, ruc) {
             this.selected = id
+            this.selectedLabel = label
+            this.selectedRuc = ruc
             localStorage.setItem(this.storageKey, id)
+            localStorage.setItem(`${this.storageKey}:label`, label ?? '')
+            localStorage.setItem(`${this.storageKey}:ruc`, ruc ?? '')
 
             window.dispatchEvent(new CustomEvent('company-selected', {
-                detail: { id }
+                detail: { id, label, ruc }
             }))
         },
 
@@ -61,7 +69,7 @@ new class extends Component
         @foreach ($companies as $company)
             <button
                 type="button"
-                x-on:click="select({{ Js::from($company['id']) }})"
+                x-on:click="select({{ Js::from($company['id']) }}, {{ Js::from($company['label']) }}, {{ Js::from($company['description']) }})"
                 class="group relative min-h-28 overflow-hidden rounded-xl border p-4 text-left transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.98]"
                 x-bind:class="isSelected({{ Js::from($company['id']) }}) ? 'border-emerald-400/50 bg-emerald-600 text-white shadow-xl' : 'border-zinc-200 bg-white text-zinc-700 shadow-sm hover:border-zinc-300 hover:bg-zinc-50 hover:shadow-md'"
             >
