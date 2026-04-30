@@ -132,7 +132,7 @@
         x-on:click="toggle()"
         @disabled($disabled)
         class="flex h-10 w-full items-center gap-2 rounded-sm border bg-white px-3 text-sm shadow-sm transition
-            {{ $error ? 'border-red-400 ring-2 ring-red-100' : 'border-zinc-200 hover:border-zinc-300 focus:ring-2 focus:ring-zinc-200' }}
+            {{ $error ? 'border-red-400 ring-2 ring-red-100' : 'border-zinc-200 hover:border-zinc-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100' }}
             {{ $disabled ? 'cursor-not-allowed bg-zinc-100 opacity-70' : '' }}"
     >
         @if($iconLeft)
@@ -178,12 +178,12 @@
     >
         @if($type !== 'simple')
             <div class="border-b border-zinc-100 p-2">
-                <flux:input
+                <x-form.input
+                    size="sm"
                     x-ref="search"
                     x-model="query"
                     x-on:input.debounce.300ms="search()"
                     placeholder="{{ $searchPlaceholder }}"
-                    class="h-9"
                 />
             </div>
         @endif
