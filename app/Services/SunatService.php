@@ -40,7 +40,7 @@ class SunatService
                 'success' => true,
                 'xml' => $xml,
                 'hash' => $hash,
-                'pdfUrl' => route('sale.pdf', $sale),
+                'pdfUrl' => route('sale.pdf', $sale->id),
                 'sunatResponse' => $sunat->sunatResponse($result),
                 'error' => null,
             ];

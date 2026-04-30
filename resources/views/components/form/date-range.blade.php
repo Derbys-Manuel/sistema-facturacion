@@ -38,6 +38,16 @@
             const start = this.from ? (this.parseLocalDate(this.from) ?? today) : today;
             this.cursor = this.formatDate(new Date(start.getFullYear(), start.getMonth(), 1));
             this.buildCalendar();
+
+            if ($wire && typeof $wire.$watch === 'function') {
+                $wire.$watch(this.fromModel, (value) => {
+                    this.from = value || null;
+                });
+
+                $wire.$watch(this.toModel, (value) => {
+                    this.to = value || null;
+                });
+            }
         },
 
         syncFromWire() {

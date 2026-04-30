@@ -13,6 +13,8 @@
     <div
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
         wire:click.self="{{ $newAction }}"
+        x-data="{ leaving: false }"
+        :class="leaving ? 'cursor-wait' : ''"
     >
         <div class="w-full max-w-5xl overflow-hidden rounded-2xl border border-black/10 bg-white shadow-xl">
             <div class="flex items-center justify-between border-b border-black/10 px-4 py-3">
@@ -68,6 +70,8 @@
                         type="button"
                         class="flex-1"
                         wire:click="{{ $listAction }}"
+                        x-on:click="leaving = true"
+                        x-bind:disabled="leaving"
                     >
                         {{ $listLabel }}
                     </x-form.button>
@@ -76,4 +80,3 @@
         </div>
     </div>
 @endif
-

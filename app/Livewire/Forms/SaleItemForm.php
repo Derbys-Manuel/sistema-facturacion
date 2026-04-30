@@ -18,13 +18,13 @@ class   SaleItemForm extends Form
     public $description;
     #[Validate('required')]
     public $unit;
-    #[Validate('required|numeric|min:0')]
+    #[Validate('required|numeric|min:0.01')]
     public $quantity = 1;
     #[Validate('required|numeric|min:0')]
     public $unitValue = 0;
     #[Validate('required|numeric|min:0')]
     public $itemValue = 0;
-    #[Validate('required|numeric|min:0')]
+    #[Validate('required|numeric|min:0.01')]
     public $unitPrice = 0;
     #[Validate('required')]
     public $igvBaseAmount = 0;
@@ -45,7 +45,7 @@ class   SaleItemForm extends Form
 
             'quantity.required' => 'La cantidad es obligatoria.',
             'quantity.numeric' => 'La cantidad debe ser numérica.',
-            'quantity.min' => 'La cantidad no puede ser menor a 0.',
+            'quantity.min' => 'La cantidad no puede ser menor a 0.01.',
 
             'unitValue.required' => 'El valor unitario es obligatorio.',
             'unitValue.numeric' => 'El valor unitario debe ser numérico.',
@@ -53,7 +53,7 @@ class   SaleItemForm extends Form
 
             'unitPrice.required' => 'El precio unitario es obligatorio.',
             'unitPrice.numeric' => 'El precio unitario debe ser numérico.',
-            'unitPrice.min' => 'El precio unitario no puede ser menor a 0.',
+            'unitPrice.min' => 'El precio unitario no puede ser menor a 0.01.',
 
             'igvPercent.required' => 'El porcentaje de IGV es obligatorio.',
             'igvPercent.numeric' => 'El porcentaje de IGV debe ser numérico.',

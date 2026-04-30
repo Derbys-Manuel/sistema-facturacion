@@ -32,6 +32,37 @@
         loading: false,
         clearAfterSelect: @js($clearAfterSelect),
         hasWireModel: @js($wireModel->value() !== null),
+        wireModel: @js($wireModel->value()),
+        isSimple: @js($type === 'simple'),
+        simpleOptions: @js($type === 'simple' ? $options : []),
+
+        init() {
+            if (! this.wireModel || ! $wire || typeof $wire.$watch !== 'function') {
+                return;
+            }
+
+            const normalize = (v) => (v === null || v === undefined || v === '' ? '' : String(v));
+
+            const syncFromWire = (value) => {
+                const normalized = normalize(value);
+
+                if (normalized === '') {
+                    this.selectedLabel = null;
+                    return;
+                }
+
+                if (this.isSimple) {
+                    const match = this.simpleOptions.find((o) => normalize(o?.value) === normalized);
+                    this.selectedLabel = match?.label ?? null;
+                }
+            };
+
+            syncFromWire($wire.get(this.wireModel));
+
+            $wire.$watch(this.wireModel, (value) => {
+                syncFromWire(value);
+            });
+        },
 
         toggle() {
             if (@js($disabled) || this.loading) return;

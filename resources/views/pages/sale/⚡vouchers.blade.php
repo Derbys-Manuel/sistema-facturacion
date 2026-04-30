@@ -62,6 +62,26 @@ new class extends Component
     public function updatedDocSunatType(): void { $this->resetPage(); }
     public function updatedOperationType(): void { $this->resetPage(); }
 
+    public function getSummaryProperty(): array
+    {
+        if (! $this->companyReady || blank($this->companyId)) {
+            return [
+                'boletas' => 0.0,
+                'facturas' => 0.0,
+                'total' => 0.0,
+            ];
+        }
+
+        return $this->sale->summary(
+            from: $this->from,
+            to: $this->to,
+            q: $this->q,
+            docSunatType: $this->docSunatType,
+            operationType: $this->operationType,
+            companyId: $this->companyId,
+        );
+    }
+
     public function getDocumentsProperty(): array
     {
         if (! $this->companyReady) {
@@ -128,7 +148,32 @@ new class extends Component
 ?>
 <div>
     @php($documents = $this->documents)
-    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    @php($summary = $this->summary)
+    <div class="mb-4 mx-auto w-full max-w-2xl grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <x-card-total
+            wire:key="summary-boletas-{{ number_format((float) ($summary['boletas'] ?? 0), 2, '.', '') }}"
+            :value="(float) ($summary['boletas'] ?? 0)"
+            subtitle="Boletas"
+            prefix="S/ "
+            :decimals="2"
+        />
+        <x-card-total
+            wire:key="summary-facturas-{{ number_format((float) ($summary['facturas'] ?? 0), 2, '.', '') }}"
+            :value="(float) ($summary['facturas'] ?? 0)"
+            subtitle="Facturas"
+            prefix="S/ "
+            :decimals="2"
+        />
+        <x-card-total
+            wire:key="summary-total-{{ number_format((float) ($summary['total'] ?? 0), 2, '.', '') }}"
+            :value="(float) ($summary['total'] ?? 0)"
+            subtitle="Total"
+            prefix="S/ "
+            :decimals="2"
+        />
+    </div>
+
+    <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <x-sale.filters
             :doc-sunat-type-options="$this->docSunatTypeOptions"
             :operation-type-options="$this->operationTypeOptions"
@@ -148,10 +193,10 @@ new class extends Component
                     @php($clientName = data_get($row, 'client.tradeName') ?: data_get($row, 'client.name'))
                     @php($clientDoc = data_get($row, 'client.documentNumber'))
                     <div class="truncate font-medium text-zinc-800">
-                        {{ $clientName ?: '-' }}
+                        {{ $clientName ?: '' }}
                     </div>
                     <div class="mt-0.5 truncate text-xs text-zinc-500 font-mono">
-                        {{ $clientDoc ?: '-' }}
+                        {{ $clientDoc ?: '' }}
                     </div>
                 </x-ui.table.cell>
                 <x-ui.table.cell>
@@ -196,14 +241,14 @@ new class extends Component
                     <div class="flex items-center justify-end gap-2">
                         <button
                             type="button"
-                            class="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50"
+                            class="rounded-md border border-zinc-200 bg-white px-2 py-0 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50"
                         >
                             Ver
                         </button>
 
                         <button
                             type="button"
-                            class="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50"
+                            class="rounded-md border border-zinc-200 bg-white px-2 py-0 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50"
                         >
                             Acción
                         </button>
@@ -218,7 +263,7 @@ new class extends Component
             </tr>
         @endforelse
     </x-ui.table>
-    <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex flex-col gap-0 sm:flex-row sm:items-center sm:justify-between">
         <div class="text-xs text-zinc-500">
             Página {{ $documents['current_page'] ?? 1 }} de {{ $documents['last_page'] ?? 1 }} ·
             {{ $documents['total'] ?? 0 }} registros
