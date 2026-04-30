@@ -9,6 +9,7 @@ use App\Livewire\Forms\ProductForm;
 use App\Services\SaleService;
 use App\Services\SunatService;
 use App\Services\SerieService;
+use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Flux\Flux;
 
@@ -70,6 +71,14 @@ new class extends Component
             return;
         }
         $this->sale->clientId = $id;
+        if (filled($label)) {
+            if (str_contains($label, ' - ')) {
+                [$name, $documentNumber] = explode(' - ', $label, 2);
+                $label = Str::limit(trim($name), 15, '...') . ' - ' . trim($documentNumber);
+            } else {
+                $label = Str::limit($label, 15, '...');
+            }
+        }
         $this->selectedClientLabel = $label;
     }
 
@@ -134,15 +143,17 @@ new class extends Component
 
     public function goToVouchers(): void
     {
+        $this->closePdfPreview();
         $this->redirectRoute('vouchers', navigate: true);
     }
+
     #[On('created-client')]
     public function clientCreated(array $client): void
     {
         $id = $client['id'];
-        $label = ($client['name'] ?: $client['tradeName'])
-            . ' - ' .
-            $client['documentNumber'];
+        $label = ($client['name'] ?: $client['tradeName']);
+        $label = Str::limit($label, 15, '...');
+        $label = $label . ' - ' . $client['documentNumber'];
         $this->sale->clientId = $id;
         $this->selectedClientLabel = $label;
         $this->clients = [

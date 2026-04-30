@@ -1,66 +1,27 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
-use App\Http\Requests\InvoiceRequest;
+use App\Models\SaleDocument;
 use App\Services\SunatService;
-use Greenter\Report\XmlUtils;
+use Illuminate\Http\Response;
 
 class InvoiceController extends Controller
 {
-    public function send(InvoiceRequest $request)
+    public function pdf(string $saleId, SunatService $sunatService): Response
     {
-        $data = $request->validated();
-        $company = $data['company'];
+        $sale = SaleDocument::query()
+            ->with(['items', 'client', 'company'])
+            ->findOrFail($saleId);
 
-        $sunat = new SunatService;
-        // $this->setTotales($data);
-        $sunat->setLegends($data);
-
-        $see = $sunat->getSee($company);
-
-        $invoice = $sunat->getInvoice($data);
-
-        $result = $see->send($invoice);
-
-        $response['xml'] = $see->getFactory()->getLastXml();
-        $response['hash'] = (new XmlUtils)->getHashSign($response['xml']);
-        $response['sunatResponse'] = $sunat->sunatResponse($result);
-
-        return $response;
-    }
-
-    public function xml(InvoiceRequest $request)
-    {
-        $data = $request->validated();
-        $company = $data['company'];
-
-        $sunat = new SunatService;
-        // $sunat->setTotales($data);
-        $sunat->setLegends($data);
-
-        $see = $sunat->getSee($company);
-        $invoice = $sunat->getInvoice($data);
-
-        $response['xml'] = $see->getXmlSigned($invoice);
-        $response['hash'] = (new XmlUtils)->getHashSign($response['xml']);
-
-        return $response;
-    }
-
-    public function pdf(InvoiceRequest $request)
-    {
-        $data = $request->validated();
-        $company = $data['company'];
-
-        $sunat = new SunatService;
-        // $sunat->setTotales($data);
-        $sunat->setLegends($data);
-
-        $see = $sunat->getSee($company);
-        $invoice = $sunat->getInvoice($data);
-
-        return $sunat->getHtmlReport($invoice);
+        $data = $sale->toArray();
+        $sunatService->setLegends($data);
+        $invoice = $sunatService->getInvoice($data, $sale);
+        $pdf = $sunatService->generatePdfReport($invoice, company: $sale->company, hash: $sale->hash);
+        $filename = sprintf('%s-%s.pdf', $sale->serie ?? 'N-A', $sale->correlative ?? 'N-A');
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        ]);
     }
 }

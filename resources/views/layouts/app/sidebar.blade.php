@@ -42,11 +42,11 @@
                 <x-sale.company-sidebar-item />
             </flux:sidebar.nav>
         </flux:sidebar>
-        <!-- Mobile Header -->
-        <flux:header class="lg:hidden">
-            <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
-            <x-app-logo href="{{ route('vouchers') }}" wire:navigate />
-        </flux:header>
+        <!-- Mobile Toggle (no top bar) -->
+        <flux:sidebar.toggle
+            class="lg:hidden fixed left-3 top-3 z-50"
+            icon="bars-2"
+        />
         <flux:modal
             name="company-select"
             class="max-w-lg bg-gray-100 p-10"

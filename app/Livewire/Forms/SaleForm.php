@@ -3,8 +3,10 @@
 namespace App\Livewire\Forms;
 
 use App\Enums\DocumentStatus;
+use App\Enums\Sunat\DocSunatType;
 use App\Models\SaleDocument;
 use App\Services\SerieService;
+use Illuminate\Database\Eloquent\Builder;
 use Livewire\Form;
 use Livewire\Attributes\Validate;
 use App\Enums\DocumentType;
@@ -197,7 +199,7 @@ class SaleForm extends Form
 
         return [
             'saleId' => (string) $sale->id,
-            'pdfUrl' => $response['pdfUrl'] ?? route('sale.pdf', $sale),
+            'pdfUrl' => $response['pdfUrl'] ?? route('sale.pdf', $sale->id),
             'sunat' => $response,
         ];
     }
@@ -210,10 +212,68 @@ class SaleForm extends Form
         ?string $operationType = null,
         ?string $companyId = null,
     ): array {
+        return $this->documentsQuery(
+            from: $from,
+            to: $to,
+            q: $q,
+            docSunatType: $docSunatType,
+            operationType: $operationType,
+            companyId: $companyId,
+        )
+            ->with(['items', 'client', 'company'])
+            ->latest('date_issue')
+            ->paginate(15)
+            ->toArray();
+    }
+
+    /**
+     * @return array{boletas: float, facturas: float, total: float}
+     */
+    public function summary(
+        ?string $from = null,
+        ?string $to = null,
+        ?string $q = null,
+        ?string $docSunatType = null,
+        ?string $operationType = null,
+        ?string $companyId = null,
+    ): array {
+        $query = $this->documentsQuery(
+            from: $from,
+            to: $to,
+            q: $q,
+            docSunatType: $docSunatType,
+            operationType: $operationType,
+            companyId: $companyId,
+        );
+
+        $total = (float) (clone $query)->sum('total');
+
+        $boletas = (float) (clone $query)
+            ->where('doc_sunat_type', DocSunatType::BOLETA->value)
+            ->sum('total');
+
+        $facturas = (float) (clone $query)
+            ->where('doc_sunat_type', DocSunatType::FACTURA->value)
+            ->sum('total');
+
+        return [
+            'boletas' => $boletas,
+            'facturas' => $facturas,
+            'total' => $total,
+        ];
+    }
+
+    private function documentsQuery(
+        ?string $from = null,
+        ?string $to = null,
+        ?string $q = null,
+        ?string $docSunatType = null,
+        ?string $operationType = null,
+        ?string $companyId = null,
+    ): Builder {
         $q = filled($q) ? trim((string) $q) : null;
 
         return SaleDocument::query()
-            ->with(['items', 'client', 'company'])
             ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
             ->when($from, fn ($query) => $query->whereDate('date_issue', '>=', $from))
             ->when($to, fn ($query) => $query->whereDate('date_issue', '<=', $to))
@@ -242,10 +302,7 @@ class SaleForm extends Form
                             )
                         )
                 )
-            )
-            ->latest('date_issue')
-            ->paginate(15)
-            ->toArray();
+            );
     }
 
 }    
