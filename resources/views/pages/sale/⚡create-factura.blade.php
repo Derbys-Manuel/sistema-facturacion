@@ -417,7 +417,6 @@ new class extends Component
         <livewire:product.create />
     </flux:modal>
 </div>
-
 @script
 <script>
     const form = $wire.$el.querySelector('#sale-form')

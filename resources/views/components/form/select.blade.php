@@ -20,6 +20,7 @@
 
 @php
     $wireModel = $attributes->wire('model');
+    $shouldTriggerRequestOnChange = $wireModel->hasModifier('live');
 @endphp
 
 <div
@@ -67,7 +68,7 @@
 
             if (this.hasWireModel) {
                 @if($wireModel->value())
-                    $wire.set('{{ $wireModel->value() }}', value, false);
+                    $wire.set('{{ $wireModel->value() }}', value, @js($shouldTriggerRequestOnChange));
                 @endif
             }
 
@@ -82,11 +83,11 @@
                             this.selectedLabel = null;
                             this.query = '';
 
-                            if (this.hasWireModel) {
-                                @if($wireModel->value())
-                                    $wire.set('{{ $wireModel->value() }}', null, false);
-                                @endif
-                            }
+                        if (this.hasWireModel) {
+                            @if($wireModel->value())
+                                $wire.set('{{ $wireModel->value() }}', null, @js($shouldTriggerRequestOnChange));
+                            @endif
+                        }
                         }
                     });
             @else
@@ -96,7 +97,7 @@
 
                     if (this.hasWireModel) {
                         @if($wireModel->value())
-                            $wire.set('{{ $wireModel->value() }}', null, false);
+                            $wire.set('{{ $wireModel->value() }}', null, @js($shouldTriggerRequestOnChange));
                         @endif
                     }
                 }
@@ -110,7 +111,7 @@
 
             if (this.hasWireModel) {
                 @if($wireModel->value())
-                    $wire.set('{{ $wireModel->value() }}', null, false);
+                    $wire.set('{{ $wireModel->value() }}', null, @js($shouldTriggerRequestOnChange));
                 @endif
             }
 
@@ -173,7 +174,7 @@
         x-cloak
         x-transition.opacity.scale.origin.top.duration.150ms
         x-on:click.outside="close()"
-        class="absolute z-[99999] mt-1 w-full overflow-hidden rounded-sm border border-zinc-200 bg-white shadow-xl"
+        class="absolute z-[100000] mt-1 w-full overflow-hidden rounded-sm border border-zinc-200 bg-white shadow-xl"
     >
         @if($type !== 'simple')
             <div class="border-b border-zinc-100 p-2">

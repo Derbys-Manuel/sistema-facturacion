@@ -30,7 +30,7 @@
                 @endisset
             </thead>
 
-            <tbody class="divide-y divide-zinc-100 {{ $striped ? '[&>tr:nth-child(even)]:bg-zinc-50' : '' }}">
+            <tbody>
                 {{ $slot }}
             </tbody>
         </table>
