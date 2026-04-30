@@ -194,7 +194,10 @@ class SaleForm extends Form
                 ? DocumentStatus::APPROVED->value
                 : DocumentStatus::REJECTED->value,
         ]);
+
         return [
+            'saleId' => (string) $sale->id,
+            'pdfUrl' => $response['pdfUrl'] ?? route('sale.pdf', $sale),
             'sunat' => $response,
         ];
     }

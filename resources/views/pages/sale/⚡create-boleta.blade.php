@@ -23,6 +23,8 @@ new class extends Component
     public array $products = [];
     public array $clients = [];
     public ?string $selectedClientLabel = null;
+    public bool $pdfPreviewOpen = false;
+    public ?string $pdfPreviewUrl = null;
 
     public function mount(): void
     {
@@ -119,6 +121,29 @@ new class extends Component
         $this->sale->dateExpiration = now()->format('Y-m-d H:i:s');
         $this->sale->docSunatType = DocSunatType::BOLETA->value;
     }
+
+    public function openPdfPreview(?string $url = null): void
+    {
+        $this->pdfPreviewUrl = filled($url) ? $url : null;
+        $this->pdfPreviewOpen = filled($this->pdfPreviewUrl);
+    }
+
+    public function closePdfPreview(): void
+    {
+        $this->pdfPreviewOpen = false;
+        $this->pdfPreviewUrl = null;
+    }
+
+    public function startNewBoleta(): void
+    {
+        $this->closePdfPreview();
+        $this->resetForm();
+    }
+
+    public function goToVouchers(): void
+    {
+        $this->redirectRoute('vouchers', navigate: true);
+    }
     #[On('created-client')]
     public function clientCreated(array $client): void
     {
@@ -168,7 +193,7 @@ new class extends Component
                 variant: $sunatSuccess ? 'success' : 'warning',
                 duration: 4000
             );
-            $this->resetForm();
+            $this->openPdfPreview($result['pdfUrl'] ?? null);
             } catch (\Throwable $th) {
                 Flux::toast(
                     heading: 'Error',
@@ -367,7 +392,7 @@ new class extends Component
                         label="Información adicional"
                         wire:model="sale.additionalInfo"
                         placeholder="Ingresa información"
-                        icon-left="hashtag"
+                        icon-left="document-text"
                         :error="$errors->first('sale.additionalInfo')"
                     />
                 </div>
@@ -427,6 +452,14 @@ new class extends Component
     >
         <livewire:product.create />
     </flux:modal>
+
+    <x-sale.pdf-preview-modal
+        :open="$pdfPreviewOpen"
+        :url="$pdfPreviewUrl"
+        new-label="Ingresar nueva boleta"
+        new-action="startNewBoleta"
+        list-action="goToVouchers"
+    />
 </div>
 
 @script

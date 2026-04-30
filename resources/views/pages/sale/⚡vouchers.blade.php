@@ -126,10 +126,10 @@ new class extends Component
     }
 };
 ?>
-<div class="p-6">
+<div>
     @php($documents = $this->documents)
     <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <x-sale.vouchers.filters
+        <x-sale.filters
             :doc-sunat-type-options="$this->docSunatTypeOptions"
             :operation-type-options="$this->operationTypeOptions"
             reset-action="resetFilters"
