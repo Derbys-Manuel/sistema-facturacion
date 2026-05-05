@@ -39,4 +39,9 @@ return [
         'url' => env('IDENTITY_BASE_DIURVAN_URL'),
     ],
 
+    'sunat-nexara' => [
+        'sol_user' => env('USER_SOL_NEXARA'),
+        'sol_pass' => env('PASS_SOL_NEXARA'),
+    ],
+
 ];

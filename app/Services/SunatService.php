@@ -292,10 +292,10 @@ class SunatService
                 'hash' => $hash,
             ],
             'user' => [
-                'header' => 'Telf: <b>(01) 123375</b>',
+                'header' => 'Telf: <b>-</b>',
                 'extras' => [
                     ['name' => 'CONDICION DE PAGO', 'value' => 'Efectivo'],
-                    ['name' => 'VENDEDOR', 'value' => 'GITHUB SELLER'],
+                    // ['name' => 'VENDEDOR', 'value' => 'GITHUB SELLER'],
                 ],
                 'footer' => '<p>Nro Resolucion: <b>3232323</b></p>',
             ],
