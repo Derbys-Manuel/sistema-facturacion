@@ -59,7 +59,7 @@
             type="button"
             @disabled($disabled)
             x-on:click="choose(@js($value))"
-            class="group relative flex items-start gap-2 rounded-sm px-3 py-3 pr-10 text-left transition
+            class="group relative cursor-pointer flex items-start gap-2 rounded-sm px-3 py-3 pr-10 text-left transition
                 {{ $disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-zinc-300 hover:bg-zinc-50 active:scale-[0.99]' }}"
             x-bind:class="String($wire.get(modelName) ?? '') === @js($value)
                 ? 'bg-emerald-50 text-zinc-900'

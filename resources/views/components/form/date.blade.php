@@ -9,7 +9,7 @@
 
 <div @class(['w-full', $wrapperClass])>
     @if ($label)
-        <flux:label class="mb-1.5">
+        <flux:label class="mb-3 text-gray-700 text-sm">
             {{ $label }}
         </flux:label>
     @endif

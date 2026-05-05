@@ -2,10 +2,11 @@
 
 use Livewire\Component;
 use App\Enums\Sunat\DocSunatType;
+use App\Enums\Sunat\DiscountType;
 use App\Livewire\Forms\SaleForm;
 use App\Livewire\Forms\SaleItemForm;
+use App\Livewire\Forms\DiscountForm;
 use App\Livewire\Forms\ClientForm;
-use App\Livewire\Forms\ProductForm;
 use App\Services\SaleService;
 use App\Services\SunatService;
 use App\Services\SerieService;
@@ -17,11 +18,12 @@ new class extends Component
 {
     public SaleForm $sale;
     public SaleItemForm $saleItem;
+    public DiscountForm $discount;
     public ClientForm $client;
-    public ProductForm $product;
+
     public array $items = [];
-    public array $products = [];
     public array $clients = [];
+
     public ?string $selectedClientLabel = null;
     public bool $pdfPreviewOpen = false;
     public ?string $pdfPreviewUrl = null;
@@ -33,18 +35,78 @@ new class extends Component
         $this->sale->dateExpiration = now()->format('d-m-Y H:i:s');
     }
 
-    public function recalculateItemFromTotal(int $index, SaleService $saleService): void
+    public function editItem(int $index): void
     {
         $item = $this->items[$index] ?? null;
-        if (! is_array($item)) return;
-        $this->items[$index] = $saleService->calculateItemFromTotal($item);
+
+        if (! is_array($item)) {
+            return;
+        }
+
+        $this->dispatch('edit-sale-item', index: $index, item: $item);
+
+        Flux::modal('sale-item')->show();
+    }
+
+    public function deletedItem(int $index, SaleService $saleService): void
+    {
+        unset($this->items[$index]);
+
+        $this->items = array_values($this->items);
+
         $saleService->applyTotals($this->sale, $this->items);
     }
 
-    public function recalculateItem(int $index, SaleService $saleService): void
+    #[On('sale-item-created')]
+    public function saleItemCreated(array $item, SaleService $saleService): void
     {
-        $item = $this->items[$index] ?? null;
-        $this->items[$index] = $saleService->calculateItem($item);
+        $this->items[] = $item;
+
+        $saleService->applyTotals($this->sale, $this->items);
+
+        $this->dispatch('reset-sale-item-modal');
+    }
+
+    #[On('sale-item-updated')]
+    public function saleItemUpdated(int $index, array $item, SaleService $saleService): void
+    {
+        if (! isset($this->items[$index])) {
+            return;
+        }
+
+        $this->items[$index] = $item;
+
+        $saleService->applyTotals($this->sale, $this->items);
+
+        $this->dispatch('reset-sale-item-modal');
+    }
+
+    public function toggleGlobalDiscount(SaleService $saleService): void
+    {
+        $enabled = (bool) data_get($this->sale->discounts, '0.enabled', false);
+
+        if ($enabled) {
+            $this->sale->discounts = [];
+        } else {
+            $this->sale->discounts = [
+                $saleService->newDiscount(DiscountType::GLOBAL->value),
+            ];
+        }
+
+        $saleService->applyTotals($this->sale, $this->items);
+    }
+
+    public function recalculateGlobalDiscountFromAmount(SaleService $saleService): void
+    {
+        data_set($this->sale->discounts, '0.mode', 'amount');
+
+        $saleService->applyTotals($this->sale, $this->items);
+    }
+
+    public function recalculateGlobalDiscountFromPercent(SaleService $saleService): void
+    {
+        data_set($this->sale->discounts, '0.mode', 'percent');
+
         $saleService->applyTotals($this->sale, $this->items);
     }
 
@@ -53,24 +115,14 @@ new class extends Component
         $this->clients = $this->client->searchWithoutDni($q);
     }
 
-    public function searchProduct(string $q = ''): void
-    {
-        $this->products = $this->product->search($q);
-    }
-
-    public function deletedItem(int $index, SaleService $saleService): void
-    {
-        unset($this->items[$index]);
-        $this->items = array_values($this->items);
-        $saleService->applyTotals($this->sale, $this->items);
-    }
-
     public function selectClient(?string $id = null, ?string $label = null): void
     {
         if (blank($id)) {
             return;
         }
+
         $this->sale->clientId = $id;
+
         if (filled($label)) {
             if (str_contains($label, ' - ')) {
                 [$name, $documentNumber] = explode(' - ', $label, 2);
@@ -79,29 +131,8 @@ new class extends Component
                 $label = Str::limit($label, 15, '...');
             }
         }
-        $this->selectedClientLabel = $label;
-    }
 
-    public function selectProduct(?string $id, ?string $label, SaleService $saleService): void
-    {
-        if (blank($id)) {
-            return;
-        }
-        $record = $this->product->getRecord($id);
-        if (! $record) {
-            return;
-        }
-        $this->saleItem->description = $record->name;
-        $this->saleItem->code = $record->sku ?? "00000";
-        $this->saleItem->unit = $record->unit ?? "NIU";
-        $this->saleItem->quantity = 1;
-        $this->saleItem->unitValue = $record->price ?? 0;
-        $this->saleItem->unitPrice = $record->price ?? 0;
-        
-        $this->items = $saleService->addItem($this->items, $this->saleItem);
-        $saleService->applyTotals($this->sale, $this->items);
-        $this->saleItem->reset();
-        $this->products = [];
+        $this->selectedClientLabel = $label;
     }
 
     public function clearClient(): void
@@ -110,17 +141,21 @@ new class extends Component
         $this->selectedClientLabel = null;
         $this->clients = [];
     }
+
     public function resetForm(): void
     {
         $this->sale->reset();
         $this->saleItem->reset();
+        $this->discount->reset();
+
         $this->items = [];
-        $this->products = [];
         $this->clients = [];
         $this->selectedClientLabel = null;
+
         $this->sale->dateIssue = now()->format('Y-m-d H:i:s');
         $this->sale->dateExpiration = now()->format('Y-m-d H:i:s');
         $this->sale->docSunatType = DocSunatType::FACTURA->value;
+        $this->sale->discounts = [];
     }
 
     public function openPdfPreview(?string $url = null): void
@@ -154,8 +189,10 @@ new class extends Component
         $label = ($client['name'] ?: $client['tradeName']);
         $label = Str::limit($label, 15, '...');
         $label = $label . ' - ' . $client['documentNumber'];
+
         $this->sale->clientId = $id;
         $this->selectedClientLabel = $label;
+
         $this->clients = [
             [
                 'value' => $id,
@@ -163,41 +200,44 @@ new class extends Component
             ],
         ];
     }
-    #[On('created-product')]
-    public function productCreated(array $product, SaleService $saleService): void
-    {
-        $this->selectProduct($product['id'] ?? null, null, $saleService);
-    }
 
     public function save(SunatService $sunatService, SerieService $serieService): void
     {
-        if(!$this->sale->companyId){
+        if (! $this->sale->companyId) {
             Flux::toast(
                 heading: 'Alerta',
                 text: 'Debe de seleccionar una empresa',
                 variant: 'warning',
-                duration:2000            
+                duration: 2000
             );
+
             return;
         }
-        if(!$this->sale->clientId){
+
+        if (! $this->sale->clientId) {
             Flux::toast(
                 heading: 'Alerta',
                 text: 'Debe de seleccionar un cliente',
                 variant: 'warning',
-                duration:2000            
+                duration: 2000
             );
+
             return;
         }
+
         try {
             $this->sale->items = $this->items;
+
             $result = $this->sale->store(
                 $this->saleItem,
                 $sunatService,
-                $serieService
+                $serieService,
+                $this->discount
             );
+
             $response = $result['sunat'] ?? [];
             $sunatSuccess = $response['sunatResponse']['success'] ?? false;
+
             Flux::toast(
                 heading: $sunatSuccess ? 'SUNAT' : 'Comprobante rechazado',
                 text: $sunatSuccess
@@ -206,109 +246,112 @@ new class extends Component
                 variant: $sunatSuccess ? 'success' : 'warning',
                 duration: 4000
             );
+
             $this->openPdfPreview($result['pdfUrl'] ?? null);
-            } catch (\Throwable $th) {
-                Flux::toast(
-                    heading: 'Error',
-                    text: $th->getMessage() ?: 'No se pudo guardar ni enviar el comprobante',
-                    variant: 'warning',
-                    duration: 4000
-                );
-                report($th);
+        } catch (\Throwable $th) {
+            Flux::toast(
+                heading: 'Error',
+                text: $th->getMessage() ?: 'No se pudo guardar ni enviar el comprobante',
+                variant: 'warning',
+                duration: 4000
+            );
+
+            report($th);
         }
     }
 };
 ?>
+
 <div>
-    <div class="grid gap-4 grid-cols-[4fr_2.5fr] h-[88vh]">
+    <div class="grid gap-4 grid-cols-[4fr_2.5fr] h-[88vh] overflow-hidden">
         <section class="flex flex-col overflow-hidden rounded-sm bg-white">
-            <div class="space-y-3 mb-3">
-                <div class="grid grid-cols-[1fr_auto] gap-2">
-                    <x-form.select
-                        wire:key="product-select"
-                        type="backend"
-                        placeholder="Buscar producto..."
-                        search-placeholder="Escribe nombre o unidad..."
-                        icon-left="archive-box"
-                        :clearable="false"
-                        :clear-after-select="true"
-                        :options="$products"
-                        search-action="searchProduct"
-                        select-action="selectProduct"
-                    />
-                    <flux:modal.trigger name="product-create">
+            <div class="space-y-3 mb-2">
+                <div class="flex justify-end">
+                    <flux:modal.trigger name="sale-item">
                         <x-form.button
                             variant="success"
-                            size="icon"
                             type="button"
                             leftIcon="plus"
-                        />
+                            size="sm"
+                        >
+                            Agregar
+                        </x-form.button>
                     </flux:modal.trigger>
                 </div>
             </div>
+
             <div class="flex-1">
-                <x-ui.table
-                    :columns="['Descripción', 'Unidad', 'Cantidad', 'Precio unit.', 'Total', '']"
-                    striped
-                    dense
-                    scroll-class="h-[64vh]"
-                >
+                <x-ui.table striped dense scroll-class="h-[55vh]">
+                    <x-slot name="head">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Descripción</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Cant.</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Precio u.</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">Descuento</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Total</th>
+                            <th class="px-2 py-3"></th>
+                        </tr>
+                    </x-slot>
+
                     @forelse ($items as $index => $item)
                         <tr wire:key="item-{{ $index }}">
                             <x-ui.table.cell dense>
                                 <div class="truncate font-medium text-zinc-800">
-                                    {{ $item['description'] }}
+                                    {{ $item['description'] ?? '-' }}
                                 </div>
                                 <div class="mt-0.5 truncate text-xs text-zinc-500 font-mono">
                                     {{ $item['code'] ?? '-' }}
                                 </div>
                             </x-ui.table.cell>
-                            <x-ui.table.cell dense class="font-mono text-xs">
-                                {{ $item['unit'] }}
-                            </x-ui.table.cell>
-                            <x-ui.table.cell dense class="w-18">
-                                <x-form.input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    wire:model.live.blur="items.{{ $index }}.quantity"
-                                    wire:blur="recalculateItem({{ $index }})"
-                                    placeholder="0.00"
-                                    :error="$errors->first('items.{{ $index }}.quantity')"
-                                />
-                            </x-ui.table.cell>
+
                             <x-ui.table.cell dense>
-                                <x-form.input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    wire:model.live.blur="items.{{ $index }}.unitPrice"
-                                    wire:blur="recalculateItem({{ $index }})"
-                                    placeholder="0.00"
-                                    :error="$errors->first('items.{{ $index }}.unitPrice')"
-                                />
+                                <span class="text-sm tabular-nums">
+                                    {{ number_format((float) ($item['quantity'] ?? 0), 4) }}
+                                </span>
                             </x-ui.table.cell>
+
                             <x-ui.table.cell dense>
-                                <x-form.input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    wire:model.live.blur="items.{{ $index }}.total"
-                                    wire:blur="recalculateItemFromTotal({{ $index }})"
-                                    placeholder="0.00"
-                                    :error="$errors->first('items.{{ $index }}.total')"
-                                />
+                                <span class="text-sm tabular-nums">
+                                    S/ {{ number_format((float) ($item['unitPrice'] ?? 0), 2) }}
+                                </span>
                             </x-ui.table.cell>
+
+                            <x-ui.table.cell dense class="text-center">
+                                <div class="text-xs text-zinc-500">
+                                    Base: S/ {{ number_format((float) data_get($item, 'discounts.0.baseAmount', 0), 2) }}
+                                </div>
+                                <div class="text-sm font-medium tabular-nums text-zinc-800">
+                                    S/ {{ number_format((float) data_get($item, 'discounts.0.discountAmount', 0), 2) }}
+                                    <span class="text-xs text-zinc-500">
+                                        ({{ number_format((float) data_get($item, 'discounts.0.uiPercent', 0), 2) }}%)
+                                    </span>
+                                </div>
+                            </x-ui.table.cell>
+
+                            <x-ui.table.cell dense>
+                                <span class="text-sm font-semibold tabular-nums">
+                                    S/ {{ number_format((float) ($item['total'] ?? 0), 2) }}
+                                </span>
+                            </x-ui.table.cell>
+
                             <x-ui.table.cell dense class="text-right">
-                                <x-form.button
-                                    variant="danger"
-                                    size="sm"
-                                    type="button"
-                                    leftIcon="trash"
-                                    wire:click="deletedItem({{ $index }})"
-                                >
-                                    <span icon="trash"></span>
-                                </x-form.button>
+                                <div class="flex justify-end gap-1">
+                                    <x-form.button
+                                        variant="ghost"
+                                        size="sm"
+                                        type="button"
+                                        leftIcon="pencil"
+                                        wire:click="editItem({{ $index }})"
+                                    />
+
+                                    <x-form.button
+                                        variant="danger"
+                                        size="sm"
+                                        type="button"
+                                        leftIcon="trash"
+                                        wire:click="deletedItem({{ $index }})"
+                                    />
+                                </div>
                             </x-ui.table.cell>
                         </tr>
                     @empty
@@ -319,34 +362,55 @@ new class extends Component
                         </tr>
                     @endforelse
                 </x-ui.table>
-                <div class="px-4 py-2 space-y-1">
+
+                @php
+                    $discountTotal = collect($items)
+                        ->sum(fn ($item) => (float) data_get($item, 'discounts.0.discountAmount', 0));
+
+                    $baseBeforeDiscount = (float) ($sale->saleValue ?? 0) + $discountTotal;
+                @endphp
+
+                <div class="px-4 py-0 space-y-1">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs text-zinc-500">
-                            Monto base
-                        </span>
+                        <span class="text-xs text-zinc-500">Base original</span>
                         <div class="rounded-sm border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold tabular-nums">
-                            S/ {{ number_format($sale->saleValue ?? 0, 2) }}
+                            S/ {{ number_format($baseBeforeDiscount, 2) }}
                         </div>
                     </div>
+
+                    @if($discountTotal > 0)
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-red-500">Descuento total</span>
+                            <div class="rounded-sm border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold tabular-nums text-red-600">
+                                - S/ {{ number_format($discountTotal, 2) }}
+                            </div>
+                        </div>
+                    @endif
+
                     <div class="flex items-center justify-between">
-                        <span class="text-xs text-zinc-500">
-                            Total igv
-                        </span>
+                        <span class="text-xs text-zinc-500">Base imponible</span>
                         <div class="rounded-sm border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold tabular-nums">
-                            S/ {{ number_format($sale->totalTaxes ?? 0, 2) }}
+                            S/ {{ number_format((float) ($sale->saleValue ?? 0), 2) }}
                         </div>
                     </div>
+
                     <div class="flex items-center justify-between">
-                        <span class="text-xs text-zinc-500">
-                            Total venta
-                        </span>
+                        <span class="text-xs text-zinc-500">Total IGV</span>
                         <div class="rounded-sm border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold tabular-nums">
-                            S/ {{ number_format($sale->total ?? 0, 2) }}
+                            S/ {{ number_format((float) ($sale->totalTaxes ?? 0), 2) }}
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between border-t border-zinc-200 pt-2 mt-2">
+                        <span class="text-sm font-semibold text-zinc-800">Total venta</span>
+                        <div class="rounded-sm bg-emerald-600 px-3 py-1 text-sm font-bold text-white tabular-nums">
+                            S/ {{ number_format((float) ($sale->total ?? 0), 2) }}
                         </div>
                     </div>
                 </div>
             </div>
         </section>
+
         <form wire:submit.prevent="save" class="contents" id="sale-form">
             <aside class="flex flex-col overflow-hidden rounded-sm shadow-inner border border-zinc-200/80 bg-white">
                 <div class="bg-gray-100/70 px-5 py-4 backdrop-blur">
@@ -364,6 +428,7 @@ new class extends Component
                         </div>
                     </div>
                 </div>
+
                 <div class="flex-1 space-y-4 overflow-auto p-4">
                     <div class="grid grid-cols-[1fr_auto] gap-3 items-end">
                         <x-form.select
@@ -380,6 +445,7 @@ new class extends Component
                             select-action="selectClient"
                             clear-action="clearClient"
                         />
+
                         <flux:modal.trigger name="client-create">
                             <x-form.button
                                 variant="success"
@@ -389,6 +455,7 @@ new class extends Component
                             />
                         </flux:modal.trigger>
                     </div>
+
                     <x-form.input
                         label="Información adicional"
                         wire:model="sale.additionalInfo"
@@ -397,16 +464,19 @@ new class extends Component
                         :error="$errors->first('sale.additionalInfo')"
                     />
                 </div>
-                <div class="border-t border-zinc-200 px-4 py-3">
+
+                <div class="bg-gray-100/70 px-4 py-3">
                     <div class="flex gap-2">
                         <x-form.button
                             variant="ghost"
                             type="button"
                             class="flex-1"
+                            wire:loading.attr="disabled"
                             wire:click="resetForm"
                         >
                             Limpiar
                         </x-form.button>
+
                         <x-form.button
                             variant="success"
                             type="submit"
@@ -414,14 +484,10 @@ new class extends Component
                             wire:loading.attr="disabled"
                             wire:target="save"
                         >
-                            <span
-                                wire:loading.remove
-                                wire:target="save"
-                                class="inline-flex items-center justify-center"
-                            >
+                            <span wire:loading.remove wire:target="save">
                                 Guardar
                             </span>
-    
+
                             <span
                                 wire:loading.flex
                                 wire:target="save"
@@ -436,6 +502,7 @@ new class extends Component
             </aside>
         </form>
     </div>
+
     <flux:modal
         name="client-create"
         class="max-w-lg bg-gray-100"
@@ -444,13 +511,14 @@ new class extends Component
     >
         <livewire:client.create />
     </flux:modal>
+
     <flux:modal
-        name="product-create"
+        name="sale-item"
         class="max-w-lg bg-gray-100"
         scroll="body"
         :dismissible="false"
     >
-        <livewire:product.create />
+        <livewire:sale.modal-item />
     </flux:modal>
 
     <x-sale.pdf-preview-modal
@@ -461,13 +529,17 @@ new class extends Component
         list-action="goToVouchers"
     />
 </div>
+
 @script
 <script>
     const form = $wire.$el.querySelector('#sale-form')
+
     if (form && ! form.dataset.companySelectorBound) {
         form.dataset.companySelectorBound = '1'
+
         form.addEventListener('submit', () => {
             const companyId = localStorage.getItem('company-selector')
+
             if (companyId) {
                 $wire.$set('sale.companyId', companyId, false)
             }

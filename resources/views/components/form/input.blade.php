@@ -6,15 +6,20 @@
     'suffix' => null,
     'iconLeft' => null,
     'iconRight' => null,
+    'textLeft' => null,
     'disabled' => false,
     'size' => 'md', // md|sm
     'wrapperClass' => null,
 ])
 
+@php
+    $type = $attributes->get('type', 'text');
+@endphp
+
 <div @class(['w-full', $wrapperClass])>
 
     @if($label)
-        <flux:label class="mb-1.5">
+        <flux:label class="mb-3 text-gray-700 text-sm">
             {{ $label }}
         </flux:label>
     @endif
@@ -34,7 +39,11 @@
             </span>
         @endif
 
-        @if($iconLeft)
+        @if($textLeft)
+            <span class="flex h-full shrink-0 items-center pl-1 pr-1 text-[8px] leading-tight text-zinc-400 whitespace-nowrap">
+                {!! $textLeft !!}
+            </span>
+        @elseif($iconLeft)
             <span class="flex h-full items-center pl-3 text-zinc-400">
                 <flux:icon :name="$iconLeft" class="size-4" />
             </span>
@@ -42,8 +51,13 @@
 
         <input
             {{ $attributes->merge([
-                'type' => 'text',
-                'class' => 'h-full w-full border-0 bg-transparent px-3 text-sm text-zinc-900 placeholder:text-zinc-400 outline-none ring-0 focus:ring-0 focus:outline-none disabled:cursor-not-allowed'
+                'type' => $type,
+                'class' => 'h-full w-full min-w-0 border-0 bg-transparent px-3 text-sm text-zinc-900 placeholder:text-zinc-400 outline-none ring-0 focus:ring-0 focus:outline-none disabled:cursor-not-allowed ' .
+                ($textLeft ? 'pl-1 ' : '') .
+                ($type === 'number'
+                    ? 'appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
+                    : ''
+                )
             ]) }}
             @disabled($disabled)
         />

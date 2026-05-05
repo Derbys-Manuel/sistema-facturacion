@@ -64,16 +64,31 @@
                     >
                         {{ $newLabel }}
                     </x-form.button>
-
                     <x-form.button
                         variant="success"
                         type="button"
-                        class="flex-1"
+                        class="flex-1 inline-flex items-center justify-center gap-2 min-h-10"
+                        wire:loading.attr="none"
+                        wire:target="{{ $listAction }}"
                         wire:click="{{ $listAction }}"
                         x-on:click="leaving = true"
                         x-bind:disabled="leaving"
                     >
-                        {{ $listLabel }}
+                        <span
+                            class="inline-flex items-center justify-center"
+                            x-show="! leaving"
+                            x-cloak
+                        >
+                            {{ $listLabel }}
+                        </span>
+                        <span
+                            class="inline-flex items-center justify-center gap-2"
+                            x-show="leaving"
+                            x-cloak
+                        >
+                            <flux:icon.loading class="size-4 animate-spin" />
+                            <span>Espere...</span>
+                        </span>
                     </x-form.button>
                 </div>
             </div>
