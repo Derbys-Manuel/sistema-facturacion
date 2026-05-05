@@ -126,7 +126,7 @@ new class extends Component
                     wire:model.defer="client.documentNumber"
                     placeholder="Ingresa el número"
                     icon-left="hashtag"
-                    action-right-icon="search"
+                    {{-- action-right-icon="search" --}}
                     action-right-click="consultDocument"
                     action-right-target="consultDocument"
                     :error="$errors->first('client.documentNumber')"
