@@ -287,9 +287,16 @@ class SaleForm extends Form
         $facturas = (float) (clone $query)
             ->where('doc_sunat_type', DocSunatType::FACTURA->value)
             ->sum('total');
+        $totalIgv = (float) (clone $query)
+            ->sum('total_igv');
+        $saleValue = (float) (clone $query)
+            ->sum('sale_value');
+        
         return [
             'boletas' => $boletas,
             'facturas' => $facturas,
+            'totalIgv' =>$totalIgv,
+            'saleValue' =>$saleValue,
             'total' => $total,
         ];
     }

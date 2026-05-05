@@ -69,6 +69,7 @@ new class extends Component
                 'boletas' => 0.0,
                 'facturas' => 0.0,
                 'total' => 0.0,
+                'totalIgv' => 0.0
             ];
         }
 
@@ -151,23 +152,23 @@ new class extends Component
     @php($summary = $this->summary)
     <div class="mb-4 mx-auto w-full max-w-2xl grid grid-cols-1 gap-3 sm:grid-cols-3">
         <x-card-total
-            wire:key="summary-boletas-{{ number_format((float) ($summary['boletas'] ?? 0), 2, '.', '') }}"
-            :value="(float) ($summary['boletas'] ?? 0)"
-            subtitle="Boletas"
+            wire:key="summary-sale-value-{{ number_format((float) ($summary['saleValue'] ?? 0), 2, '.', '') }}"
+            :value="(float) ($summary['saleValue'] ?? 0)"
+            subtitle="VALOR"
             prefix="S/ "
             :decimals="2"
         />
         <x-card-total
-            wire:key="summary-facturas-{{ number_format((float) ($summary['facturas'] ?? 0), 2, '.', '') }}"
-            :value="(float) ($summary['facturas'] ?? 0)"
-            subtitle="Facturas"
+            wire:key="summary-total-igv-{{ number_format((float) ($summary['totalIgv'] ?? 0), 2, '.', '') }}"
+            :value="(float) ($summary['totalIgv'] ?? 0)"
+            subtitle="IGV"
             prefix="S/ "
             :decimals="2"
         />
         <x-card-total
             wire:key="summary-total-{{ number_format((float) ($summary['total'] ?? 0), 2, '.', '') }}"
             :value="(float) ($summary['total'] ?? 0)"
-            subtitle="Total"
+            subtitle="TOTAL"
             prefix="S/ "
             :decimals="2"
         />
