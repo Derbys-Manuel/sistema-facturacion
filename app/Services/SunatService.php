@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\Sunat\DocIdentityType;
 use App\Livewire\Forms\SaleForm;
+use Greenter\Model\Sale\Charge;
 use App\Models\SaleDocument;
 use App\Models\Client as ClientModels;
 use App\Models\Company as CompanyModels;
@@ -72,7 +73,7 @@ class SunatService
 
     public function getInvoice($data, SaleDocument $sale)
     {
-        return (new Invoice())
+        $invoice = (new Invoice())
             ->setUblVersion($data['ublVersion'] ?? '2.1')
             ->setTipoOperacion($data['operationType'] ?? null) // Venta - Catalog. 51
             ->setTipoDoc($data['docSunatType'] ?? null) // Factura - Catalog. 01 
@@ -98,6 +99,11 @@ class SunatService
             ->setMtoImpVenta($data['total'])
             ->setDetails($this->getDetails($data['items']))
             ->setLegends($this->getLegends($data['legends']));
+             $documentDiscounts = $data['discounts'] ?? [];
+            if (!empty($documentDiscounts)) {
+                $invoice->setDescuentos($this->mapDiscountsToCharges($documentDiscounts));
+            }
+        return $invoice;
     }
     public function getCompany(CompanyModels $company)
     {
@@ -126,28 +132,61 @@ class SunatService
             ->setDireccion($company->address ?? null)
             ->setCodLocal($company->cod_local ?? null); // Codigo de establecimiento asignado por SUNAT, 0000 por defecto.
     }
-    public function getDetails($details)
+    public function getDetails(array $details): array
     {
-        $green_details = [];
+        $greenDetails = [];
         foreach ($details as $detail) {
-            $green_details[] = (new SaleDetail())
-                ->setCodProducto($detail['code'] ?? null)
-                ->setUnidad($detail['unit'] ?? 'NIU')
-                ->setCantidad((float) ($detail['quantity'] ?? 0))
-                ->setDescripcion($detail['description'] ?? '')
+            $discountAmount = (float) data_get($detail, 'discounts.0.discountAmount', 0);
+            $precioUnitarioOperacion = $discountAmount > 0
+                ? (float) ($detail['unitPriceWithDiscount'] ?? $detail['unitPrice'] ?? 0)
+                : (float) ($detail['unitPrice'] ?? 0);
+            $saleDetail = (new SaleDetail())
+                ->setCodProducto((string) ($detail['code'] ?? '00000'))
+                ->setUnidad((string) ($detail['unit'] ?? 'NIU'))
+                ->setCantidad((float) ($detail['quantity'] ?? 1))
+                ->setDescripcion((string) ($detail['description'] ?? 'PRODUCTO'))
                 ->setMtoValorUnitario((float) ($detail['unitValue'] ?? 0))
-                ->setMtoValorVenta((float) ($detail['itemValue'] ?? 0))
-                ->setMtoPrecioUnitario((float) ($detail['unitPrice'] ?? 0))
+                ->setMtoValorVenta((float) ($detail['itemValue'] ?? $detail['saleValue'] ?? 0))
+                ->setMtoPrecioUnitario($precioUnitarioOperacion)
                 ->setMtoBaseIgv((float) ($detail['igvBaseAmount'] ?? 0))
-                ->setPorcentajeIgv((float) ($detail['igvPercent'] ?? 0))
-                ->setIgv((float) ($detail['igvAmount'] ?? 0))
-                ->setTipAfeIgv($detail['igvAffectationType'] ?? null)
+                ->setPorcentajeIgv((float) ($detail['igvPercent'] ?? 18))
+                ->setIgv((float) ($detail['igvAmount'] ?? $detail['igv'] ?? 0))
+                ->setTipAfeIgv((string) ($detail['igvAffectationType'] ?? '10'))
                 ->setFactorIcbper((float) ($detail['icbperFactor'] ?? 0))
                 ->setIcbper((float) ($detail['icbperAmount'] ?? 0))
-                ->setTotalImpuestos((float) ($detail['taxesTotal'] ?? 0));
+                ->setTotalImpuestos((float) ($detail['taxesTotal'] ?? $detail['totalTaxes'] ?? 0));
+            $itemDiscounts = $detail['discounts'] ?? [];
+            if (! empty($itemDiscounts) && $discountAmount > 0) {
+                $saleDetail->setDescuentos(
+                    $this->mapDiscountsToCharges($itemDiscounts)
+                );
+            }
+            $greenDetails[] = $saleDetail;
         }
-        return $green_details;
+
+        return $greenDetails;
     }
+    public function mapDiscountToCharge(array $discount): Charge
+    {
+        $baseAmount = ($discount['baseAmount'] ?? 0);
+        $factorPorcentage = ($discount['factorPorcentage'] ?? 0);
+        $discountAmount = ($discount['discountAmount'] ?? 0);
+        $factor = $factorPorcentage;
+        return (new Charge())
+            ->setCodTipo((string) ($discount['type'] ?? '00'))
+            ->setMontoBase($baseAmount)
+            ->setFactor($factor)
+            ->setMonto($discountAmount);
+    }
+    public function mapDiscountsToCharges(array $discounts): array
+    {
+        $charges = [];
+        foreach ($discounts as $discount) {
+            $charges[] = $this->mapDiscountToCharge($discount);
+        }
+        return $charges;
+    }
+
     public function getLegends($legends)
     {
         $green_legends = [];

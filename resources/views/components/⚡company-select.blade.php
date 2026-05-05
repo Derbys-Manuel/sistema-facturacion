@@ -70,7 +70,7 @@ new class extends Component
             <button
                 type="button"
                 x-on:click="select({{ Js::from($company['id']) }}, {{ Js::from($company['label']) }}, {{ Js::from($company['description']) }})"
-                class="group relative min-h-28 overflow-hidden rounded-xl border p-4 text-left transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.98]"
+                class="group relative min-h-28 overflow-hidden rounded-sm border p-4 text-left transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.98]"
                 x-bind:class="isSelected({{ Js::from($company['id']) }}) ? 'border-emerald-400/50 bg-emerald-600 text-white shadow-xl' : 'border-zinc-200 bg-white text-zinc-700 shadow-sm hover:border-zinc-300 hover:bg-zinc-50 hover:shadow-md'"
             >
                 <div

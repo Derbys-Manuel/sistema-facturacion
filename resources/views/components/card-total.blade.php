@@ -15,7 +15,7 @@
 
 <div
     {{ $attributes->class([
-        'rounded-2xl bg-gray-100/50 p-3 shadow-inner transition-shadow',
+        'rounded-sm bg-gray-100/50 p-3 shadow-inner transition-shadow',
         'hover:shadow-md',
         'dark:border-white/10 dark:bg-zinc-900',
     ]) }}

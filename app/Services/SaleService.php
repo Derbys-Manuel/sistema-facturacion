@@ -3,11 +3,37 @@
 namespace App\Services;
 
 use App\Enums\Sunat\AffecType;
+use App\Enums\Sunat\DiscountType;
 use App\Livewire\Forms\SaleForm;
 use App\Livewire\Forms\SaleItemForm;
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 
 class SaleService
 {
+    private const SCALE_UNIT = 5;
+    private const SCALE_BASE = 5;
+    private const SCALE_DISCOUNT = 2;
+    private const SCALE_MONEY = 2;
+    private const SCALE_FACTOR = 5;
+    private const SCALE_CALC = 10;
+
+    public function newDiscount(string $type = DiscountType::ITEM->value): array
+    {
+        return [
+            'type' => $type,
+            'baseAmount' => '0.00000',
+            'factorPorcentage' => '0.00000',
+            'discountAmount' => '0.00',
+            'uiPercent' => '0.00',
+            'enabled' => true,
+            'mode' => 'amount',
+
+            // base = descuento SUNAT, total = descuento comercial
+            'applyTo' => 'base',
+        ];
+    }
+
     public function addItem(array $items, SaleItemForm $saleItem): array
     {
         $item = [
@@ -18,151 +44,328 @@ class SaleService
             'quantity' => $saleItem->quantity,
             'unitPrice' => $saleItem->unitPrice,
             'igvPercent' => $saleItem->igvPercent,
+            'discounts' => $saleItem->discounts ?? [],
         ];
+
         $items[] = $this->calculateItem($item);
+
         return $items;
     }
-    public function calculateItem(array $item, $totalItem = null): array
-    {
-        $quantity = (float) ($item['quantity'] ?? 1);
-        $unitPrice = (float) ($item['unitPrice'] ?? 0);
-        $igvPercent = (float) ($item['igvPercent'] ?? 18);
 
-        if ($totalItem !== null) {
-            $total = (float) $totalItem;
-        } else {
-            $total = round($quantity * $unitPrice, 2);
+    public function calculateItem(array $item, $totalItem = null, ?string $discountRecalculateFrom = null): array
+    {
+        $quantity = $this->bd($item['quantity'] ?? '1');
+        $unitPrice = $this->bd($item['unitPrice'] ?? '0');
+        $igvPercent = $this->bd($item['igvPercent'] ?? '18');
+
+        if ($quantity->isLessThanOrEqualTo('0')) {
+            $quantity = $this->bd('1');
         }
 
         $igvAffectationType = (string) ($item['igvAffectationType'] ?? AffecType::GRAVADO->value);
 
-        if ($igvAffectationType === AffecType::GRAVADO->value) {
-            $unitValue = round($unitPrice / (1 + ($igvPercent / 100)), 6);
-            $itemValue = round($quantity * $unitValue, 2);
-            $igvAmount = round($total - $itemValue, 2);
-            $igvBaseAmount = $itemValue;
-            $taxesTotal = $igvAmount;
+        $grossTotal = $quantity
+            ->multipliedBy($unitPrice)
+            ->toScale(self::SCALE_MONEY, RoundingMode::HALF_UP);
+
+        [$unitValue, $grossBaseAmount] = $this->calculateItemAmounts(
+            quantity: $quantity,
+            unitPrice: $unitPrice,
+            igvPercent: $igvPercent,
+            igvAffectationType: $igvAffectationType,
+        );
+
+        $discountApplyTo = (string) data_get($item, 'discounts.0.applyTo', 'base');
+
+        if ($discountApplyTo === 'total') {
+            [$discounts, $discountAmount] = $this->normalizeDiscounts(
+                discounts: $item['discounts'] ?? null,
+                baseAmount: $grossTotal,
+                recalculateFrom: $discountRecalculateFrom
+            );
+
+            $totalWithDiscount = $grossTotal
+                ->minus($discountAmount)
+                ->toScale(self::SCALE_MONEY, RoundingMode::HALF_UP);
+
+            if ($totalWithDiscount->isLessThan('0')) {
+                $totalWithDiscount = $this->bd('0')->toScale(self::SCALE_MONEY);
+            }
+
+            if ($igvAffectationType === AffecType::GRAVADO->value) {
+                $taxFactor = $this->taxFactor($igvPercent);
+
+                $itemValue = $totalWithDiscount
+                    ->dividedBy($taxFactor, self::SCALE_BASE, RoundingMode::HALF_UP);
+
+                $igvAmount = $totalWithDiscount
+                    ->minus($itemValue)
+                    ->toScale(self::SCALE_MONEY, RoundingMode::HALF_UP);
+
+                $igvBaseAmount = $itemValue;
+                $taxesTotal = $igvAmount;
+            } else {
+                $itemValue = $totalWithDiscount->toScale(self::SCALE_BASE, RoundingMode::HALF_UP);
+                $igvAmount = $this->bd('0')->toScale(self::SCALE_MONEY);
+                $igvBaseAmount = $this->bd('0')->toScale(self::SCALE_BASE);
+                $taxesTotal = $this->bd('0')->toScale(self::SCALE_MONEY);
+            }
         } else {
-            $unitValue = round($unitPrice, 6);
-            $itemValue = round($quantity * $unitValue, 2);
-            $igvAmount = 0.0;
-            $igvBaseAmount = 0.0;
-            $taxesTotal = 0.0;
+            [$discounts, $discountAmount] = $this->normalizeDiscounts(
+                discounts: $item['discounts'] ?? null,
+                baseAmount: $grossBaseAmount,
+                recalculateFrom: $discountRecalculateFrom
+            );
+
+            $itemValue = $grossBaseAmount
+                ->minus($discountAmount)
+                ->toScale(self::SCALE_BASE, RoundingMode::HALF_UP);
+
+            if ($itemValue->isLessThan('0')) {
+                $itemValue = $this->bd('0')->toScale(self::SCALE_BASE);
+            }
+
+            if ($igvAffectationType === AffecType::GRAVADO->value) {
+                $igvAmount = $itemValue
+                    ->multipliedBy($igvPercent)
+                    ->dividedBy('100', self::SCALE_MONEY, RoundingMode::HALF_UP);
+
+                $igvBaseAmount = $itemValue;
+                $taxesTotal = $igvAmount;
+            } else {
+                $igvAmount = $this->bd('0')->toScale(self::SCALE_MONEY);
+                $igvBaseAmount = $this->bd('0')->toScale(self::SCALE_BASE);
+                $taxesTotal = $this->bd('0')->toScale(self::SCALE_MONEY);
+            }
+
+            $totalWithDiscount = $itemValue
+                ->plus($taxesTotal)
+                ->toScale(self::SCALE_MONEY, RoundingMode::HALF_UP);
         }
 
+        $unitPriceWithDiscount = $quantity->isGreaterThan('0')
+            ? $totalWithDiscount->dividedBy($quantity, self::SCALE_MONEY, RoundingMode::HALF_UP)
+            : $this->bd('0')->toScale(self::SCALE_MONEY);
+
         return array_merge($item, [
-            'quantity' => $quantity,
-            'unitPrice' => $unitPrice,
-            'unitValue' => $unitValue,
-            'saleValue' => $itemValue,
-            'itemValue' => $itemValue,
-            'total' => $total,
-            'igv' => $igvAmount,
-            'igvBaseAmount' => $igvBaseAmount,
-            'igvAmount' => $igvAmount,
-            'totalTaxes' => $taxesTotal,
-            'taxesTotal' => $taxesTotal,
+            'quantity' => (string) $quantity,
+            'unitPrice' => $this->format($unitPrice, self::SCALE_MONEY),
+            'unitValue' => $this->format($unitValue, self::SCALE_UNIT),
+            'saleValue' => $this->format($itemValue, self::SCALE_BASE),
+            'itemValue' => $this->format($itemValue, self::SCALE_BASE),
+            'total' => $this->format($totalWithDiscount, self::SCALE_MONEY),
+            'igv' => $this->format($igvAmount, self::SCALE_MONEY),
+            'igvBaseAmount' => $this->format($igvBaseAmount, self::SCALE_BASE),
+            'igvAmount' => $this->format($igvAmount, self::SCALE_MONEY),
+            'totalTaxes' => $this->format($taxesTotal, self::SCALE_MONEY),
+            'taxesTotal' => $this->format($taxesTotal, self::SCALE_MONEY),
+            'discounts' => $discounts,
+            'discountAmount' => $this->format($discountAmount, self::SCALE_DISCOUNT),
+            'unitPriceWithDiscount' => $this->format($unitPriceWithDiscount, self::SCALE_MONEY),
+            'totalWithoutDiscount' => $this->format($grossTotal, self::SCALE_MONEY),
         ]);
     }
-    public function calculateItemFromTotal(array $item): array
+
+    public function calculateItemFromTotal(array $item, ?string $discountRecalculateFrom = null): array
     {
-        $quantity = (float) ($item['quantity'] ?? 1);
-        $total = (float) ($item['total'] ?? 0);
-        $igvPercent = (float) ($item['igvPercent'] ?? 18);
-        $igvAffectationType = (string) ($item['igvAffectationType'] ?? AffecType::GRAVADO->value);
+        $quantity = $this->bd($item['quantity'] ?? '1');
+        $total = $this->bd($item['total'] ?? '0');
 
-        if ($quantity <= 0) {
-            $quantity = 1;
+        if ($quantity->isLessThanOrEqualTo('0')) {
+            $quantity = $this->bd('1');
         }
 
-        $unitPrice = round($total / $quantity, 2);
+        $unitPrice = $total->dividedBy($quantity, self::SCALE_MONEY, RoundingMode::HALF_UP);
 
-        if ($igvAffectationType === AffecType::GRAVADO->value) {
-            $unitValue = round($unitPrice / (1 + ($igvPercent / 100)), 6);
-            $itemValue = round($quantity * $unitValue, 2);
-            $igvAmount = round($total - $itemValue, 2);
-            $igvBaseAmount = $itemValue;
-            $taxesTotal = $igvAmount;
-        } else {
-            $unitValue = round($unitPrice, 6);
-            $itemValue = round($quantity * $unitValue, 2);
-            $igvAmount = 0.0;
-            $igvBaseAmount = 0.0;
-            $taxesTotal = 0.0;
-        }
-
-        return array_merge($item, [
-            'quantity' => $quantity,
-            'unitPrice' => $unitPrice,
-            'unitValue' => $unitValue,
-            'saleValue' => $itemValue,
-            'itemValue' => $itemValue,
-            'igvBaseAmount' => $igvBaseAmount,
-            'total' => round($total, 2),
-            'igv' => $igvAmount,
-            'igvAmount' => $igvAmount,
-            'totalTaxes' => $taxesTotal,
-            'taxesTotal' => $taxesTotal,
-        ]);
+        return $this->calculateItem(
+            array_merge($item, [
+                'quantity' => (string) $quantity,
+                'unitPrice' => (string) $unitPrice,
+            ]),
+            null,
+            $discountRecalculateFrom
+        );
     }
+
     public function calculateTotals(array $items): array
     {
-        $details = collect($items);
-        $totalTaxed = $details
-            ->where('igvAffectationType', AffecType::GRAVADO->value)
-            ->sum('itemValue');
+        $totalTaxed = $this->sumWhere($items, 'igvAffectationType', AffecType::GRAVADO->value, 'itemValue', self::SCALE_BASE);
+        $totalExempted = $this->sumWhere($items, 'igvAffectationType', AffecType::EXONERADO->value, 'itemValue', self::SCALE_BASE);
+        $totalUnaffected = $this->sumWhere($items, 'igvAffectationType', AffecType::INAFECTO->value, 'itemValue', self::SCALE_BASE);
+        $totalFree = $this->sumWhere($items, 'igvAffectationType', AffecType::GRATUITO->value, 'itemValue', self::SCALE_BASE);
 
-        $totalExempted = $details
-            ->where('igvAffectationType', AffecType::EXONERADO->value)
-            ->sum('itemValue');
+        $totalExport = $this->bd('0')->toScale(self::SCALE_BASE);
+        $icbper = $this->bd('0')->toScale(self::SCALE_MONEY);
 
-        $totalUnaffected = $details
-            ->where('igvAffectationType', AffecType::INAFECTO->value)
-            ->sum('itemValue');
+        $totalIgv = $this->sumWhere($items, 'igvAffectationType', AffecType::GRAVADO->value, 'igvAmount', self::SCALE_MONEY);
+        $totalIgvFree = $this->sumWhere($items, 'igvAffectationType', AffecType::GRATUITO->value, 'igvAmount', self::SCALE_MONEY);
 
-        $totalExport = 0;
+        $totalTaxes = $totalIgv->plus($icbper)->toScale(self::SCALE_MONEY, RoundingMode::HALF_UP);
 
-        $totalFree = $details
-            ->where('igvAffectationType', AffecType::GRATUITO->value)
-            ->sum('itemValue');
+        $saleValue = $totalTaxed
+            ->plus($totalExempted)
+            ->plus($totalUnaffected)
+            ->plus($totalExport)
+            ->toScale(self::SCALE_BASE, RoundingMode::HALF_UP);
 
-        $totalIgv = $details
-            ->where('igvAffectationType', AffecType::GRAVADO->value)
-            ->sum('igvAmount');
-
-        $totalIgvFree = $details
-            ->where('igvAffectationType', AffecType::GRATUITO->value)
-            ->sum('igvAmount');
-
-        $icbper = 0;
-        $totalTaxes = round($totalIgv + $icbper, 2);
-        $saleValue = round($totalTaxed + $totalExempted + $totalUnaffected + $totalExport, 2);
-        $subTotal = round($saleValue + $totalTaxes, 2);
-        $totalSale = round($subTotal, 2);
-        $rounding = round($totalSale - $subTotal, 2);
+        $subTotal = $saleValue->plus($totalTaxes)->toScale(self::SCALE_MONEY, RoundingMode::HALF_UP);
 
         return [
-            'totalTaxed' => round($totalTaxed, 2),
-            'totalExempted' => round($totalExempted, 2),
-            'totalUnaffected' => round($totalUnaffected, 2),
-            'totalExport' => round($totalExport, 2),
-            'totalFree' => round($totalFree, 2),
-            'totalIgv' => round($totalIgv, 2),
-            'totalIgvFree' => round($totalIgvFree, 2),
-            'icbper' => $icbper,
-            'totalTaxes' => $totalTaxes,
-            'saleValue' => $saleValue,
-            'subTotal' => $subTotal,
-            'totalSale' => $totalSale,
-            'rounding' => $rounding,
-            'total' => $totalSale,
+            'totalTaxed' => $this->format($totalTaxed, self::SCALE_BASE),
+            'totalExempted' => $this->format($totalExempted, self::SCALE_BASE),
+            'totalUnaffected' => $this->format($totalUnaffected, self::SCALE_BASE),
+            'totalExport' => $this->format($totalExport, self::SCALE_BASE),
+            'totalFree' => $this->format($totalFree, self::SCALE_BASE),
+
+            'totalIgv' => $this->format($totalIgv, self::SCALE_MONEY),
+            'totalIgvFree' => $this->format($totalIgvFree, self::SCALE_MONEY),
+            'icbper' => $this->format($icbper, self::SCALE_MONEY),
+
+            'totalTaxes' => $this->format($totalTaxes, self::SCALE_MONEY),
+            'saleValue' => $this->format($saleValue, self::SCALE_BASE),
+            'subTotal' => $this->format($subTotal, self::SCALE_MONEY),
+            'totalSale' => $this->format($subTotal, self::SCALE_MONEY),
+            'rounding' => '0.00',
+            'total' => $this->format($subTotal, self::SCALE_MONEY),
         ];
     }
 
     public function applyTotals(SaleForm $sale, array $items): void
     {
-        foreach ($this->calculateTotals($items) as $key => $value) {
+        $totals = $this->calculateTotals($items);
+
+        foreach ($totals as $key => $value) {
             $sale->{$key} = $value;
         }
+    }
+
+    private function calculateItemAmounts(
+        BigDecimal $quantity,
+        BigDecimal $unitPrice,
+        BigDecimal $igvPercent,
+        string $igvAffectationType,
+    ): array {
+        if ($igvAffectationType === AffecType::GRAVADO->value) {
+            $unitValue = $unitPrice->dividedBy($this->taxFactor($igvPercent), self::SCALE_UNIT, RoundingMode::HALF_UP);
+        } else {
+            $unitValue = $unitPrice->toScale(self::SCALE_UNIT, RoundingMode::HALF_UP);
+        }
+
+        $baseAmount = $unitValue
+            ->multipliedBy($quantity)
+            ->toScale(self::SCALE_BASE, RoundingMode::HALF_UP);
+
+        return [$unitValue, $baseAmount];
+    }
+
+    private function normalizeDiscounts(?array $discounts, BigDecimal $baseAmount, ?string $recalculateFrom): array
+    {
+        if (! is_array($discounts) || empty($discounts)) {
+            return [[], $this->bd('0')->toScale(self::SCALE_DISCOUNT)];
+        }
+
+        $first = is_array($discounts[0] ?? null) ? $discounts[0] : [];
+        $enabled = (bool) ($first['enabled'] ?? true);
+
+        if (! $enabled) {
+            return [[], $this->bd('0')->toScale(self::SCALE_DISCOUNT)];
+        }
+
+        $baseAmount = $baseAmount->toScale(self::SCALE_DISCOUNT, RoundingMode::HALF_UP);
+
+        $uiPercent = $this->bd($first['uiPercent'] ?? $first['percent'] ?? '0');
+        $factor = $this->bd($first['factorPorcentage'] ?? '0');
+        $discountAmount = $this->bd($first['discountAmount'] ?? '0');
+        $mode = (string) ($first['mode'] ?? '');
+        $applyTo = (string) ($first['applyTo'] ?? 'base');
+
+        if ($recalculateFrom === 'percent' || $mode === 'percent') {
+            if ($uiPercent->isLessThanOrEqualTo('0') && $factor->isGreaterThan('0')) {
+                $uiPercent = $factor->multipliedBy('100');
+            }
+
+            if ($uiPercent->isLessThan('0')) {
+                $uiPercent = $this->bd('0');
+            }
+
+            if ($uiPercent->isGreaterThan('100')) {
+                $uiPercent = $this->bd('100');
+            }
+
+            $factor = $uiPercent->dividedBy('100', self::SCALE_FACTOR, RoundingMode::HALF_UP);
+
+            $discountAmount = $baseAmount
+                ->multipliedBy($factor)
+                ->toScale(self::SCALE_DISCOUNT, RoundingMode::HALF_UP);
+
+            $mode = 'percent';
+        } else {
+            if ($discountAmount->isLessThan('0')) {
+                $discountAmount = $this->bd('0');
+            }
+
+            if ($discountAmount->isGreaterThan($baseAmount)) {
+                $discountAmount = $baseAmount;
+            }
+
+            $discountAmount = $discountAmount->toScale(self::SCALE_DISCOUNT, RoundingMode::HALF_UP);
+
+            $factor = $baseAmount->isGreaterThan('0')
+                ? $discountAmount->dividedBy($baseAmount, self::SCALE_FACTOR, RoundingMode::HALF_UP)
+                : $this->bd('0')->toScale(self::SCALE_FACTOR);
+
+            $uiPercent = $factor->multipliedBy('100')->toScale(self::SCALE_MONEY, RoundingMode::HALF_UP);
+
+            $mode = 'amount';
+        }
+
+        $normalized = [[
+            'type' => (string) ($first['type'] ?? '00'),
+            'baseAmount' => $this->format($baseAmount, self::SCALE_BASE),
+            'factorPorcentage' => $this->format($factor, self::SCALE_FACTOR),
+            'discountAmount' => $this->format($discountAmount, self::SCALE_DISCOUNT),
+            'uiPercent' => $this->format($uiPercent, self::SCALE_MONEY),
+            'enabled' => true,
+            'mode' => $mode,
+            'applyTo' => $applyTo,
+        ]];
+
+        if ($baseAmount->isLessThanOrEqualTo('0') || $discountAmount->isLessThanOrEqualTo('0')) {
+            return [$normalized, $this->bd('0')->toScale(self::SCALE_DISCOUNT)];
+        }
+
+        return [$normalized, $discountAmount];
+    }
+
+    private function sumWhere(array $items, string $whereKey, string $whereValue, string $sumKey, int $scale): BigDecimal
+    {
+        $total = $this->bd('0');
+
+        foreach ($items as $item) {
+            if ((string) ($item[$whereKey] ?? '') !== $whereValue) {
+                continue;
+            }
+
+            $total = $total->plus($this->bd($item[$sumKey] ?? '0'));
+        }
+
+        return $total->toScale($scale, RoundingMode::HALF_UP);
+    }
+
+    private function taxFactor(BigDecimal $igvPercent): BigDecimal
+    {
+        return $this->bd('1')->plus(
+            $igvPercent->dividedBy('100', self::SCALE_CALC, RoundingMode::HALF_UP)
+        );
+    }
+
+    private function bd(string|int|float|null $value): BigDecimal
+    {
+        return BigDecimal::of((string) ($value ?? '0'));
+    }
+
+    private function format(BigDecimal $value, int $scale): string
+    {
+        return (string) $value->toScale($scale, RoundingMode::HALF_UP);
     }
 }

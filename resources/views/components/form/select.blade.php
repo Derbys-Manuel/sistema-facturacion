@@ -16,6 +16,7 @@
     'clearAction' => null,
 
     'clearAfterSelect' => false,
+    'keepOpenAfterSelect' => false,
 ])
 
 @php
@@ -30,16 +31,15 @@
         query: '',
         selectedLabel: @js($selectedLabel),
         loading: false,
+
         clearAfterSelect: @js($clearAfterSelect),
+        keepOpenAfterSelect: @js($keepOpenAfterSelect),
+
         hasWireModel: @js($wireModel->value() !== null),
         wireModel: @js($wireModel->value()),
-        isSimple: @js($type === 'simple'),
-        simpleOptions: @js($type === 'simple' ? $options : []),
 
         init() {
-            if (! this.wireModel || ! $wire || typeof $wire.$watch !== 'function') {
-                return;
-            }
+            if (!this.wireModel || ! $wire || typeof $wire.$watch !== 'function') return;
 
             const normalize = (v) => (v === null || v === undefined || v === '' ? '' : String(v));
 
@@ -51,10 +51,8 @@
                     return;
                 }
 
-                if (this.isSimple) {
-                    const match = this.simpleOptions.find((o) => normalize(o?.value) === normalized);
-                    this.selectedLabel = match?.label ?? null;
-                }
+                const match = @js($options).find(o => normalize(o.value) === normalized);
+                this.selectedLabel = match?.label ?? this.selectedLabel;
             };
 
             syncFromWire($wire.get(this.wireModel));
@@ -69,38 +67,29 @@
 
             this.open = !this.open;
 
-            if (this.open && @js($type !== 'simple')) {
+            if (this.open) {
                 this.$nextTick(() => this.$refs.search?.focus());
             }
         },
 
         close() {
             this.open = false;
-            this.query = '';
         },
 
         search() {
-            if (@js($type === 'simple')) return;
-
             @if($searchAction)
                 this.loading = true;
 
                 $wire.$call('{{ $searchAction }}', this.query)
-                    .finally(() => {
-                        this.loading = false;
-                    });
+                    .finally(() => this.loading = false);
             @endif
         },
 
         choose(value, label) {
             this.selectedLabel = label;
-            this.query = '';
-            this.open = false;
 
             if (this.hasWireModel) {
-                @if($wireModel->value())
-                    $wire.set('{{ $wireModel->value() }}', value, @js($shouldTriggerRequestOnChange));
-                @endif
+                $wire.set(this.wireModel, value, @js($shouldTriggerRequestOnChange));
             }
 
             @if($selectAction)
@@ -109,30 +98,33 @@
                 $wire.$call('{{ $selectAction }}', value, label)
                     .finally(() => {
                         this.loading = false;
-
-                        if (this.clearAfterSelect) {
-                            this.selectedLabel = null;
-                            this.query = '';
-
-                        if (this.hasWireModel) {
-                            @if($wireModel->value())
-                                $wire.set('{{ $wireModel->value() }}', null, @js($shouldTriggerRequestOnChange));
-                            @endif
-                        }
-                        }
+                        this.afterSelect();
                     });
             @else
-                if (this.clearAfterSelect) {
-                    this.selectedLabel = null;
-                    this.query = '';
-
-                    if (this.hasWireModel) {
-                        @if($wireModel->value())
-                            $wire.set('{{ $wireModel->value() }}', null, @js($shouldTriggerRequestOnChange));
-                        @endif
-                    }
-                }
+                this.afterSelect();
             @endif
+        },
+
+        afterSelect() {
+            if (this.clearAfterSelect) {
+                this.selectedLabel = null;
+
+                if (this.hasWireModel) {
+                    $wire.set(this.wireModel, null, @js($shouldTriggerRequestOnChange));
+                }
+            }
+
+            if (this.keepOpenAfterSelect) {
+                this.query = '';
+
+                setTimeout(() => {
+                    this.open = true;
+                    this.$refs.search?.focus();
+                }, 80);
+            } else {
+                this.query = '';
+                this.open = false;
+            }
         },
 
         clear() {
@@ -141,9 +133,7 @@
             this.open = false;
 
             if (this.hasWireModel) {
-                @if($wireModel->value())
-                    $wire.set('{{ $wireModel->value() }}', null, @js($shouldTriggerRequestOnChange));
-                @endif
+                $wire.set(this.wireModel, null, @js($shouldTriggerRequestOnChange));
             }
 
             @if($clearAction)
@@ -152,22 +142,22 @@
         }
     }"
 >
+    {{-- LABEL --}}
     @if($label)
-        <flux:label class="mb-1.5">
+        <flux:label class="mb-3 text-gray-700 text-sm">
             {{ $label }}
         </flux:label>
     @endif
 
+    {{-- BOTÓN --}}
     <button
         type="button"
         x-on:click="toggle()"
-        @disabled($disabled)
         class="flex h-10 w-full items-center gap-2 rounded-sm border bg-white px-3 text-sm shadow-sm transition
-            {{ $error ? 'border-red-400 ring-2 ring-red-100' : 'border-zinc-200 hover:border-zinc-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100' }}
-            {{ $disabled ? 'cursor-not-allowed bg-zinc-100 opacity-70' : '' }}"
+        {{ $error ? 'border-red-400 ring-2 ring-red-100' : 'border-zinc-200 hover:border-zinc-300 focus:ring-emerald-100 focus:ring-2' }}"
     >
         @if($iconLeft)
-            <flux:icon :name="$iconLeft" class="size-4 shrink-0 text-zinc-400" />
+            <flux:icon :name="$iconLeft" class="size-4 text-zinc-400" />
         @endif
 
         <span
@@ -176,84 +166,47 @@
             x-text="selectedLabel || @js($placeholder)"
         ></span>
 
-        <flux:icon.loading
-            x-show="loading"
-            x-cloak
-            class="size-4 shrink-0 animate-spin text-zinc-400"
-        />
-
-        @if($clearable)
-            <span
-                x-show="selectedLabel && !loading"
-                x-cloak
-                x-on:click.stop="clear()"
-                class="flex size-5 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-red-50 hover:text-red-500"
-            >
-                <flux:icon.x-mark class="size-4" />
-            </span>
-        @endif
-
-        <flux:icon.chevron-down
-            x-show="!loading"
-            class="size-4 shrink-0 text-zinc-400 transition"
-            x-bind:class="open ? 'rotate-180' : ''"
-        />
+        <flux:icon.chevron-down class="size-4 text-zinc-400" />
     </button>
 
+    {{-- DROPDOWN --}}
     <div
         x-show="open"
         x-cloak
-        x-transition.opacity.scale.origin.top.duration.150ms
-        x-on:click.outside="close()"
-        class="absolute z-[100000] mt-1 w-full overflow-hidden rounded-sm border border-zinc-200 bg-white shadow-xl"
+        x-transition
+        x-on:click.outside="if (!keepOpenAfterSelect) close()"
+        class="absolute z-50 mt-1 w-full rounded-sm border bg-white shadow-lg"
     >
-        @if($type !== 'simple')
-            <div class="border-b border-zinc-100 p-2">
-                <x-form.input
-                    size="sm"
-                    x-ref="search"
-                    x-model="query"
-                    x-on:input.debounce.300ms="search()"
-                    placeholder="{{ $searchPlaceholder }}"
-                />
-            </div>
-        @endif
+        {{-- SEARCH --}}
+        <div class="p-2 border-b">
+            <x-form.input
+                x-ref="search"
+                x-model="query"
+                x-on:input.debounce.300ms="search()"
+                placeholder="{{ $searchPlaceholder }}"
+                size="sm"
+            />
+        </div>
 
-        <div class="max-h-64 overflow-y-auto p-1">
+        {{-- LISTA --}}
+        <div class="max-h-64 overflow-y-auto">
             @forelse($options as $option)
                 <button
                     type="button"
                     x-on:click="choose(@js($option['value']), @js($option['label']))"
-                    class="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-zinc-50"
+                    class="w-full px-3 py-2 text-left hover:bg-zinc-50 text-sm"
                 >
-                    @if(!empty($option['icon']))
-                        <flux:icon :name="$option['icon']" class="size-4 shrink-0 text-zinc-400" />
-                    @endif
-
-                    <span class="flex-1 truncate">
-                        {{ $option['label'] }}
-                    </span>
-
-                    @if(!empty($option['description']))
-                        <span class="truncate text-xs text-zinc-400">
-                            {{ $option['description'] }}
-                        </span>
-                    @endif
+                    {{ $option['label'] }}
                 </button>
             @empty
-                <div class="px-3 py-5 text-center text-sm text-zinc-400">
+                <div class="p-4 text-center text-sm text-zinc-400">
                     Sin resultados
                 </div>
             @endforelse
         </div>
     </div>
 
-    @if($hint && !$error)
-        <flux:description class="mt-1">
-            {{ $hint }}
-        </flux:description>
-    @endif
-
+    {{-- ERROR --}}
     @if($error)
         <flux:error class="mt-1">
             {{ $error }}

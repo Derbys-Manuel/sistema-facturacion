@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Enums\Sunat\AffecType;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use App\Models\BaseModel;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SaleDocumentItem extends BaseModel
 {
@@ -51,6 +51,11 @@ class SaleDocumentItem extends BaseModel
 
     public function saleDocument(): BelongsTo
     {
-        return $this->belongsTo(SaleDocument::class);
+        return $this->belongsTo(SaleDocument::class, 'sale_document_id');
+    }
+
+    public function discounts(): HasMany
+    {
+        return $this->hasMany(Discount::class, 'sale_document_item_id');
     }
 }

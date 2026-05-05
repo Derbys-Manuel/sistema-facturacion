@@ -11,7 +11,7 @@ class InvoiceController extends Controller
     public function pdf(string $saleId, SunatService $sunatService): Response
     {
         $sale = SaleDocument::query()
-            ->with(['items', 'client', 'company'])
+            ->with(['items', 'client', 'company', 'items.discounts'])
             ->findOrFail($saleId);
 
         $data = $sale->toArray();

@@ -15,6 +15,7 @@ use App\Enums\Sunat\PaymentForm;
 use Illuminate\Support\Facades\DB;
 use App\Services\SunatService;
 use App\Livewire\Forms\SaleItemForm;
+use App\Livewire\Forms\DiscountForm;
 
 class SaleForm extends Form
 {
@@ -104,6 +105,9 @@ class SaleForm extends Form
     #[Validate('required|array|min:1')]
     public array $items = [];
 
+    #[Validate('nullable|array')]
+    public ?array $discounts = null;
+
     public function messages(): array
     {
         return [
@@ -133,12 +137,23 @@ class SaleForm extends Form
             'dateIssue' => 'fecha de emisión',
             'dateExpiration' => 'fecha de vencimiento',
             'items' => 'productos',
+            'discounts' => 'descuentos',
         ];
     }
-    public function store(SaleItemForm $itemForm, SunatService $sunatService, SerieService $serieService): array
+    public function store(
+        SaleItemForm $itemForm, 
+        SunatService $sunatService, 
+        SerieService $serieService,
+        DiscountForm $discountForm
+    ): array
     {
         $data = $this->validate();
-        $sale = DB::transaction(function () use ($data, $itemForm, $serieService) {
+        $sale = DB::transaction(function () use (
+            $data,
+            $itemForm,
+            $serieService,
+            $discountForm,
+        ) {
             $serie = $serieService->getSerieForUpdate(
                 $data['docSunatType'],
                 $data['companyId']
@@ -179,12 +194,38 @@ class SaleForm extends Form
                 'company_id' => $data['companyId'] ?? null,
                 'client_id' => $data['clientId'] ?? null,
             ])->load('company', 'client');
-            $itemForm->store($data['items'], (string) $sale->id);
+            $saleDiscounts = $data['discounts'] ?? [];
+            if (is_array($saleDiscounts) && collect($saleDiscounts)->contains(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)) {
+                $discountForm->store(
+                    discounts: $saleDiscounts,
+                    saleDocumentId: (string) $sale->id,
+                    saleDocumentItemId: null
+                );
+            }
+            $itemForm->store($data['items'], (string) $sale->id, $discountForm);
             return $sale;
         });
 
         $data['serie'] = (string) ($sale->serie ?? '');
         $data['correlative'] = (string) ($sale->correlative ?? '');
+        $data['discounts'] = collect($data['discounts'] ?? [])
+            ->filter(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)
+            ->values()
+            ->all();
+        $data['items'] = collect($data['items'] ?? [])
+            ->map(function ($item) {
+                if (! is_array($item)) {
+                    return $item;
+                }
+
+                $item['discounts'] = collect($item['discounts'] ?? [])
+                    ->filter(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)
+                    ->values()
+                    ->all();
+
+                return $item;
+            })
+            ->all();
 
         $response = $sunatService->send($data, $sale);
         $sunatSuccess = $response['sunatResponse']['success'] ?? false;
@@ -196,14 +237,12 @@ class SaleForm extends Form
                 ? DocumentStatus::APPROVED->value
                 : DocumentStatus::REJECTED->value,
         ]);
-
         return [
             'saleId' => (string) $sale->id,
             'pdfUrl' => $response['pdfUrl'] ?? route('sale.pdf', $sale->id),
             'sunat' => $response,
         ];
     }
-
     public function list(
         ?string $from = null,
         ?string $to = null,
@@ -225,10 +264,6 @@ class SaleForm extends Form
             ->paginate(15)
             ->toArray();
     }
-
-    /**
-     * @return array{boletas: float, facturas: float, total: float}
-     */
     public function summary(
         ?string $from = null,
         ?string $to = null,
@@ -245,17 +280,13 @@ class SaleForm extends Form
             operationType: $operationType,
             companyId: $companyId,
         );
-
         $total = (float) (clone $query)->sum('total');
-
         $boletas = (float) (clone $query)
             ->where('doc_sunat_type', DocSunatType::BOLETA->value)
             ->sum('total');
-
         $facturas = (float) (clone $query)
             ->where('doc_sunat_type', DocSunatType::FACTURA->value)
             ->sum('total');
-
         return [
             'boletas' => $boletas,
             'facturas' => $facturas,
