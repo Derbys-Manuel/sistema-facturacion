@@ -100,14 +100,38 @@ new class extends Component
                 icon-left="identification"
                 :error="$errors->first('client.docIdentityType')"
             />
-
-            <x-form.input
-                label="Número documento"
-                wire:model.defer="client.documentNumber"
-                placeholder="Ingresa el número"
-                icon-left="hashtag"
-                :error="$errors->first('client.documentNumber')"
-            />
+            <div
+                x-show="[
+                    '{{ DocIdentityType::DNI->value }}',
+                    '{{ DocIdentityType::FOREIGN_CARD->value }}'
+                ].includes(String($wire.client.docIdentityType))"
+                x-cloak
+                x-transition.opacity.scale.origin.top.duration.150ms
+            >
+                <x-form.input
+                    label="Número documento"
+                    wire:model.defer="client.documentNumber"
+                    placeholder="Ingresa el número"
+                    icon-left="hashtag"
+                    :error="$errors->first('client.documentNumber')"
+                />
+            </div>
+            <div
+            x-show="String($wire.client.docIdentityType) === '{{ DocIdentityType::RUC->value }}'"
+            x-cloak
+            x-transition.opacity.scale.origin.top.duration.150ms
+            >
+               <x-form.input
+                    label="Número documento"
+                    wire:model.defer="client.documentNumber"
+                    placeholder="Ingresa el número"
+                    icon-left="hashtag"
+                    action-right-icon="search"
+                    action-right-click="consultDocument"
+                    action-right-target="consultDocument"
+                    :error="$errors->first('client.documentNumber')"
+                />
+            </div>
 
         </div>
 

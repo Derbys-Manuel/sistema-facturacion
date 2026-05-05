@@ -34,5 +34,9 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'diurvan' => [
+        'key' => env('IDENTITY_API_DIURVAN_KEY'),
+        'url' => env('IDENTITY_BASE_DIURVAN_URL'),
+    ],
 
 ];

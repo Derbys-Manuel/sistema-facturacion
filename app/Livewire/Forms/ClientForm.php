@@ -5,6 +5,7 @@ namespace App\Livewire\Forms;
 use App\Enums\Sunat\DocIdentityType;
 use App\Models\Client;
 use Livewire\Form;
+use App\Services\IdentityDiurvanService;
 
 class ClientForm extends Form
 {
@@ -36,6 +37,29 @@ class ClientForm extends Form
             DocIdentityType::RUC->value => ['required', 'digits:11'],  // RUC
             default => ['required', 'max:20'],
         };
+    }
+
+    public function consultDocument(IdentityDiurvanService $identityService)
+    {
+        if (strlen($this->documentNumber) === 8) {
+            $response = $identityService->searchDni($this->documentNumber);
+        } elseif (strlen($this->documentNumber) === 11) {
+            $response = $identityService->searchRuc($this->documentNumber);
+        } else {
+            return;
+        }
+
+        if (! $response['success']) {
+            return;
+        }
+
+        $data = $response['data'];
+
+        // Ajusta estos campos según la respuesta real de la API.
+        $this->name = $data['nombres'] ?? $data['nombre'] ?? null;
+        $this->tradeName = $data['razonSocial'] ?? $data['razon_social'] ?? null;
+        $this->address = $data['direccion'] ?? null;
+        return $data;
     }
 
     public function store(): array
