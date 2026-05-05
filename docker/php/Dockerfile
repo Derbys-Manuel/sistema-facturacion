@@ -1,16 +1,20 @@
-FROM node:22-alpine AS node_build
-
-WORKDIR /app
-COPY package.json package-lock.json vite.config.js ./
-COPY resources ./resources
-RUN npm ci --no-audit --no-fund
-RUN npm run build
-
 FROM composer:2 AS composer_deps
 
 WORKDIR /app
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --prefer-dist --no-progress
+RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS libxml2-dev \
+  && docker-php-ext-install -j"$(nproc)" soap \
+  && apk del .build-deps
+RUN composer install --no-dev --no-interaction --prefer-dist --no-progress --no-scripts
+
+FROM node:22-bookworm-slim AS node_build
+
+WORKDIR /app
+COPY package.json package-lock.json vite.config.js ./
+COPY resources ./resources
+COPY --from=composer_deps /app/vendor ./vendor
+RUN npm ci --no-audit --no-fund
+RUN npm run build
 
 FROM php:8.3-apache-bookworm AS app
 
@@ -23,6 +27,8 @@ RUN apt-get update \
     fontconfig \
     fonts-dejavu-core \
     libicu-dev \
+    libonig-dev \
+    libxml2-dev \
     libpq-dev \
     libzip-dev \
     wkhtmltopdf \
@@ -30,6 +36,7 @@ RUN apt-get update \
     intl \
     mbstring \
     pdo_pgsql \
+    soap \
     zip \
   && a2enmod rewrite \
   && sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/000-default.conf \
