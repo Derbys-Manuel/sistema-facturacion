@@ -173,7 +173,6 @@ new class extends Component
             :decimals="2"
         />
     </div>
-
     <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <x-sale.filters
             :doc-sunat-type-options="$this->docSunatTypeOptions"
@@ -247,12 +246,6 @@ new class extends Component
                             Ver
                         </button>
 
-                        <button
-                            type="button"
-                            class="rounded-md border border-zinc-200 bg-white px-2 py-0 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50"
-                        >
-                            Acción
-                        </button>
                     </div>
                 </x-ui.table.cell>
             </tr>
@@ -290,6 +283,13 @@ new class extends Component
             </x-form.button>
         </div>
     </div>
+    <x-sale.pdf-preview-modal
+        :open="$pdfPreviewOpen"
+        :url="$pdfPreviewUrl"
+        new-label="Ingresar nueva factura"
+        new-action="startNewInvoice"
+        list-action="goToVouchers"
+    />
 </div>
 @script
 <script>

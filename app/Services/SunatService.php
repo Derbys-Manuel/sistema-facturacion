@@ -98,6 +98,7 @@ class SunatService
             ->setRedondeo($data['rounding'])
             ->setMtoImpVenta($data['total'])
             ->setDetails($this->getDetails($data['items']))
+            ->setObservacion($data['additionalInfo'] ?? null)
             ->setLegends($this->getLegends($data['legends']));
              $documentDiscounts = $data['discounts'] ?? [];
             if (!empty($documentDiscounts)) {
@@ -232,13 +233,13 @@ class SunatService
                 'header'     => 'Telf: <b>(01) 123375</b>', // Texto que se ubica debajo de la dirección de empresa
                 'extras'     => [
                     // Leyendas adicionales
-                    ['name' => 'CONDICION DE PAGO', 'value' => 'Efectivo'     ],
-                    ['name' => 'VENDEDOR'         , 'value' => 'GITHUB SELLER'],
+                    ['name' => 'CONDICION DE PAGO', 'value' => 'Contado'     ],
+                    // ['name' => 'VENDEDOR'         , 'value' => 'GITHUB SELLER'],
                 ],
                 'footer' => '<p>Nro Resolucion: <b>3232323</b></p>'
             ]
         ];
-        return $report->render($invoice, $this->reportParams($company, $hash));
+        return $report->render($invoice, $this->reportParams($company, $hash, $invoice->getObservacion()));
     }
     public function generatePdfReport(Invoice $invoice, ?CompanyModels $company = null, ?string $hash = null): string
     {
@@ -268,7 +269,7 @@ class SunatService
                 'footer' => '<p>Nro Resolucion: <b>3232323</b></p>'
             ]
         ];
-        $pdf = $report->render($invoice, $this->reportParams($company, $hash));
+        $pdf = $report->render($invoice, $this->reportParams($company, $hash, $invoice->getObservacion()));
 
         if ($pdf === null) {
             throw new \RuntimeException('No se pudo generar el PDF. Verifique `WKHTML_PDF_PATH` y que wkhtmltopdf este instalado.');
@@ -278,26 +279,33 @@ class SunatService
         // Storage::put('invoices/' . $invoice->getName() . '.pdf', $pdf);
     }
 
-    private function reportParams(?CompanyModels $company = null, ?string $hash = null): array
-    {
+    private function reportParams(
+        ?CompanyModels $company = null,
+        ?string $hash = null,
+        ?string $additionalInfo = null,
+    ): array {
         $logo = '';
-
-        if ($company && filled($company->logo_path) && Storage::exists($company->logo_path)) {
-            $logo = Storage::get($company->logo_path);
+        if ($company && filled($company->logo_path)) {
+            $logoPath = storage_path($company->logo_path);
+            if (file_exists($logoPath)) {
+                $logo = file_get_contents($logoPath);
+            }
         }
-
         return [
             'system' => [
                 'logo' => $logo,
-                'hash' => $hash,
+                // 'hash' => $hash,
             ],
             'user' => [
-                'header' => 'Telf: <b>-</b>',
-                'extras' => [
-                    ['name' => 'CONDICION DE PAGO', 'value' => 'Efectivo'],
-                    // ['name' => 'VENDEDOR', 'value' => 'GITHUB SELLER'],
-                ],
-                'footer' => '<p>Nro Resolucion: <b>3232323</b></p>',
+                // 'header' => 'Telf: <b>-</b>',
+                'extras' => array_filter([
+                    ['name' => 'CONDICION DE PAGO', 'value' => 'Contado'],
+
+                    filled($additionalInfo)
+                        ? ['name' => 'OBSERVACIÓN', 'value' => $additionalInfo]
+                        : null,
+                ]),
+                // 'footer' => '<p>Nro Resolucion: <b>3232323</b></p>',
             ],
         ];
     }

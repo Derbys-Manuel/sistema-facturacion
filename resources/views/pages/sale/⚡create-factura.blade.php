@@ -428,7 +428,6 @@ new class extends Component
                         </div>
                     </div>
                 </div>
-
                 <div class="flex-1 space-y-4 overflow-auto p-4 scrollbar-thin-stable">
                     <div class="grid grid-cols-[1fr_auto] gap-3 items-end">
                         <x-form.select
@@ -445,7 +444,6 @@ new class extends Component
                             select-action="selectClient"
                             clear-action="clearClient"
                         />
-
                         <flux:modal.trigger name="client-create">
                             <x-form.button
                                 variant="success"
@@ -455,7 +453,6 @@ new class extends Component
                             />
                         </flux:modal.trigger>
                     </div>
-
                     <x-form.input
                         label="Información adicional"
                         wire:model="sale.additionalInfo"
@@ -463,14 +460,12 @@ new class extends Component
                         icon-left="document-text"
                         :error="$errors->first('sale.additionalInfo')"
                     />
-
                     <x-form.date
                         label="Fecha de emisión"
                         wire:model="sale.dateIssue"
                         :error="$errors->first('sale.dateIssue')"
                     />
                 </div>
-
                 <div class="bg-gray-100/70 px-4 py-3">
                     <div class="flex gap-2">
                         <x-form.button
