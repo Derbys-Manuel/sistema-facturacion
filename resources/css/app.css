@@ -45,6 +45,27 @@
     ::file-selector-button {
         border-color: var(--color-gray-200, currentColor);
     }
+    .scrollbar-thin-stable {
+        scrollbar-gutter: stable;
+        scrollbar-width: thin;
+        scrollbar-color: #d4d4d8 transparent;
+    }
+
+    .scrollbar-thin-stable::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    .scrollbar-thin-stable::-webkit-scrollbar-thumb {
+        background: #d4d4d8;
+        border-radius: 9999px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+    }
+
+    .scrollbar-thin-stable::-webkit-scrollbar-track {
+        background: transparent;
+    }
 }
 
 [data-flux-field]:not(ui-radio, ui-checkbox) {

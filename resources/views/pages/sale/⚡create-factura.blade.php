@@ -31,8 +31,8 @@ new class extends Component
     public function mount(): void
     {
         $this->sale->docSunatType = DocSunatType::FACTURA->value;
-        $this->sale->dateIssue = now()->format('d-m-Y H:i:s');
-        $this->sale->dateExpiration = now()->format('d-m-Y H:i:s');
+        $this->sale->dateIssue = now('America/Lima')->format('Y-m-d H:i:s');
+        $this->sale->dateExpiration = now('America/Lima')->format('Y-m-d H:i:s');
     }
 
     public function editItem(int $index): void
@@ -152,8 +152,8 @@ new class extends Component
         $this->clients = [];
         $this->selectedClientLabel = null;
 
-        $this->sale->dateIssue = now()->format('Y-m-d H:i:s');
-        $this->sale->dateExpiration = now()->format('Y-m-d H:i:s');
+        $this->sale->dateIssue = now('America/Lima')->format('Y-m-d H:i:s');
+        $this->sale->dateExpiration = now('America/Lima')->format('Y-m-d H:i:s');
         $this->sale->docSunatType = DocSunatType::FACTURA->value;
         $this->sale->discounts = [];
     }
@@ -263,8 +263,8 @@ new class extends Component
 ?>
 
 <div>
-    <div class="grid gap-4 grid-cols-[4fr_2.5fr] h-[88vh] overflow-hidden">
-        <section class="flex flex-col overflow-hidden rounded-sm bg-white">
+    <div class="grid gap-4 grid-cols-[4fr_2.5fr] h-[88vh] overflow-auto scrollbar-thin-stable">
+        <section class="flex flex-col overflow-auto rounded-sm bg-white scrollbar-thin-stable">
             <div class="space-y-3 mb-2">
                 <div class="flex justify-end">
                     <flux:modal.trigger name="sale-item">
@@ -378,7 +378,7 @@ new class extends Component
                         </div>
                     </div>
 
-                    @if($discountTotal > 0)
+                    @if ($discountTotal > 0)
                         <div class="flex items-center justify-between">
                             <span class="text-xs text-red-500">Descuento total</span>
                             <div class="rounded-sm border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold tabular-nums text-red-600">
@@ -412,7 +412,7 @@ new class extends Component
         </section>
 
         <form wire:submit.prevent="save" class="contents" id="sale-form">
-            <aside class="flex flex-col overflow-hidden rounded-sm shadow-inner border border-zinc-200/80 bg-white">
+            <aside class="scrollbar-thin-stable flex flex-col overflow-auto rounded-sm shadow-inner border border-zinc-200/80 bg-white">
                 <div class="bg-gray-100/70 px-5 py-4 backdrop-blur">
                     <div class="flex items-center gap-3">
                         <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100/80 text-emerald-700 ring-1 ring-sky-200/50">
@@ -429,7 +429,7 @@ new class extends Component
                     </div>
                 </div>
 
-                <div class="flex-1 space-y-4 overflow-auto p-4">
+                <div class="flex-1 space-y-4 overflow-auto p-4 scrollbar-thin-stable">
                     <div class="grid grid-cols-[1fr_auto] gap-3 items-end">
                         <x-form.select
                             wire:key="client-select-{{ $sale->clientId ?? 'empty' }}"
@@ -462,6 +462,12 @@ new class extends Component
                         placeholder="Ingresa información"
                         icon-left="document-text"
                         :error="$errors->first('sale.additionalInfo')"
+                    />
+
+                    <x-form.date
+                        label="Fecha de emisión"
+                        wire:model="sale.dateIssue"
+                        :error="$errors->first('sale.dateIssue')"
                     />
                 </div>
 

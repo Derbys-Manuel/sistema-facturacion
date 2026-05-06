@@ -235,49 +235,60 @@ new class extends Component
                 Datos del producto
             </h2>
         </div>
-        <div x-data="{ open: false }" class="relative">
-            <div
-                class="transition-opacity duration-150"
-                wire:loading.class="opacity-60"
-                wire:target="searchProduct,selectProduct"
-            >
-                <x-form.input
-                    label="Descripción"
-                    type="text"
-                    size="sm"
-                    wire:model.live.debounce.300ms="saleItem.description"
-                    x-on:input.debounce.300ms="
-                        open = true;
-                        $wire.searchProduct($event.target.value);
-                    "
-                    x-on:focus="open = true"
-                    placeholder="Buscar o escribir descripción..."
-                    :error="$errors->first('saleItem.description')"
-                />
-            </div>
-
-            @if(count($products))
+        <div class="grid grid-cols-[1fr_auto] gap-2">
+            <div x-data="{ open: false }" class="relative">
                 <div
-                    x-show="open"
-                    x-cloak
-                    x-transition.opacity.scale.origin.top.duration.150ms
-                    x-on:click.outside="open = false"
-                    class="absolute z-[100000] mt-1 w-full max-h-64 overflow-y-auto rounded-sm border border-zinc-200 bg-white shadow-xl"
+                    class="transition-opacity duration-150"
+                    wire:loading.class="opacity-60"
+                    wire:target="searchProduct,selectProduct"
                 >
-                    @foreach($products as $option)
-                        <button
-                            type="button"
-                            class="w-full px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-emerald-50 hover:text-emerald-700"
-                            x-on:click="
-                                open = false;
-                                $wire.selectProduct(@js($option['value']), @js($option['label']));
-                            "
-                        >
-                            {{ $option['label'] }}
-                        </button>
-                    @endforeach
+                    <x-form.input
+                        label="Descripción"
+                        type="text"
+                        size="sm"
+                        wire:model.live.debounce.300ms="saleItem.description"
+                        x-on:input.debounce.300ms="
+                            open = true;
+                            $wire.searchProduct($event.target.value);
+                        "
+                        x-on:focus="open = true"
+                        placeholder="Buscar o escribir descripción..."
+                        :error="$errors->first('saleItem.description')"
+                    />
                 </div>
-            @endif
+    
+                @if(count($products))
+                    <div
+                        x-show="open"
+                        x-cloak
+                        x-transition.opacity.scale.origin.top.duration.150ms
+                        x-on:click.outside="open = false"
+                        class="absolute z-[100000] mt-1 w-full max-h-64 overflow-y-auto rounded-sm border border-zinc-200 bg-white shadow-xl"
+                    >
+                        @foreach($products as $option)
+                            <button
+                                type="button"
+                                class="w-full px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-emerald-50 hover:text-emerald-700"
+                                x-on:click="
+                                    open = false;
+                                    $wire.selectProduct(@js($option['value']), @js($option['label']));
+                                "
+                            >
+                                {{ $option['label'] }}
+                            </button>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+            <flux:modal.trigger name="product-create">
+                <x-form.button
+                    variant="success"
+                    size="icon"
+                    type="button"
+                    leftIcon="plus"
+                    class="mt-6"
+                />
+            </flux:modal.trigger>
         </div>
 
         {{-- INPUTS PRINCIPALES --}}
@@ -432,4 +443,12 @@ new class extends Component
             </x-form.button>
         </div>
     </div>
+    <flux:modal
+        name="product-create"
+        class="max-w-lg bg-gray-100"
+        scroll="body"
+        :dismissible="false"
+    >
+        <livewire:product.create />
+    </flux:modal>
 </div>
