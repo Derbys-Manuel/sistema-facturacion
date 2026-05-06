@@ -302,7 +302,7 @@ class SunatService
                     ['name' => 'CONDICION DE PAGO', 'value' => 'Contado'],
 
                     filled($additionalInfo)
-                        ? ['name' => 'INFORMACIÓN ADICIONAL', 'value' => $additionalInfo]
+                        ? ['name' => 'OBSERVACIÓN', 'value' => $additionalInfo]
                         : null,
                 ]),
                 // 'footer' => '<p>Nro Resolucion: <b>3232323</b></p>',
