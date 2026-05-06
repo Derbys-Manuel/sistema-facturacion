@@ -2,12 +2,9 @@
 
 use App\Models\Client;
 use App\Models\Company;
-use App\Models\CreditQuota;
 use App\Models\Department;
+use App\Models\Discount;
 use App\Models\District;
-use App\Models\Pack;
-use App\Models\PackItem;
-use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\Province;
@@ -15,71 +12,45 @@ use App\Models\SaleDocument;
 use App\Models\SaleDocumentItem;
 use App\Models\Serie;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 test('models define expected relationships', function () {
-    expect((new Client)->department())->toBeInstanceOf(BelongsTo::class);
-    expect((new Client)->province())->toBeInstanceOf(BelongsTo::class);
-    expect((new Client)->district())->toBeInstanceOf(BelongsTo::class);
     expect((new Client)->saleDocuments())->toBeInstanceOf(HasMany::class);
 
-    expect((new Company)->department())->toBeInstanceOf(BelongsTo::class);
-    expect((new Company)->province())->toBeInstanceOf(BelongsTo::class);
-    expect((new Company)->district())->toBeInstanceOf(BelongsTo::class);
-    expect((new Company)->paymentMethods())->toBeInstanceOf(HasMany::class);
     expect((new Company)->saleDocuments())->toBeInstanceOf(HasMany::class);
+    expect((new Company)->paymentMethods())->toBeInstanceOf(HasMany::class);
+    expect((new Company)->series())->toBeInstanceOf(HasMany::class);
 
     expect((new Department)->provinces())->toBeInstanceOf(HasMany::class);
-    expect((new Department)->clients())->toBeInstanceOf(HasMany::class);
-    expect((new Department)->companies())->toBeInstanceOf(HasMany::class);
 
     expect((new Province)->department())->toBeInstanceOf(BelongsTo::class);
     expect((new Province)->districts())->toBeInstanceOf(HasMany::class);
-    expect((new Province)->clients())->toBeInstanceOf(HasMany::class);
-    expect((new Province)->companies())->toBeInstanceOf(HasMany::class);
 
     expect((new District)->province())->toBeInstanceOf(BelongsTo::class);
-    expect((new District)->clients())->toBeInstanceOf(HasMany::class);
-    expect((new District)->companies())->toBeInstanceOf(HasMany::class);
+
+    expect((new PaymentMethod)->company())->toBeInstanceOf(BelongsTo::class);
 
     expect((new SaleDocument)->company())->toBeInstanceOf(BelongsTo::class);
     expect((new SaleDocument)->client())->toBeInstanceOf(BelongsTo::class);
     expect((new SaleDocument)->items())->toBeInstanceOf(HasMany::class);
-    expect((new SaleDocument)->creditQuotas())->toBeInstanceOf(HasMany::class);
-    expect((new SaleDocument)->payments())->toBeInstanceOf(HasMany::class);
+    expect((new SaleDocument)->discounts())->toBeInstanceOf(HasMany::class);
 
     expect((new SaleDocumentItem)->saleDocument())->toBeInstanceOf(BelongsTo::class);
+    expect((new SaleDocumentItem)->discounts())->toBeInstanceOf(HasMany::class);
 
-    expect((new CreditQuota)->saleDocument())->toBeInstanceOf(BelongsTo::class);
-    expect((new CreditQuota)->payments())->toBeInstanceOf(HasMany::class);
+    expect((new Discount)->saleDocument())->toBeInstanceOf(BelongsTo::class);
+    expect((new Discount)->saleDocumentItem())->toBeInstanceOf(BelongsTo::class);
 
-    expect((new PaymentMethod)->company())->toBeInstanceOf(BelongsTo::class);
-    expect((new PaymentMethod)->payments())->toBeInstanceOf(HasMany::class);
-
-    expect((new Payment)->saleDocument())->toBeInstanceOf(BelongsTo::class);
-    expect((new Payment)->paymentMethod())->toBeInstanceOf(BelongsTo::class);
-    expect((new Payment)->creditQuota())->toBeInstanceOf(BelongsTo::class);
-
-    expect((new Pack)->items())->toBeInstanceOf(HasMany::class);
-    expect((new Pack)->products())->toBeInstanceOf(BelongsToMany::class);
-
-    expect((new PackItem)->pack())->toBeInstanceOf(BelongsTo::class);
-    expect((new PackItem)->product())->toBeInstanceOf(BelongsTo::class);
-
-    expect((new Product)->packItems())->toBeInstanceOf(HasMany::class);
-    expect((new Product)->packs())->toBeInstanceOf(BelongsToMany::class);
+    expect((new Serie)->company())->toBeInstanceOf(BelongsTo::class);
 });
 
 test('uuid models are non-incrementing and use string keys', function () {
     $uuidModels = [
         new Client,
         new Company,
-        new CreditQuota,
         new Department,
+        new Discount,
         new District,
-        new Pack,
-        new Payment,
         new PaymentMethod,
         new Product,
         new Province,
@@ -98,17 +69,15 @@ test('models define expected fillable attributes', function () {
     $expectedFillable = [
         Client::class => [
             'name',
-            'last_name',
             'trade_name',
-            'address',
-            'email',
-            'telephone',
             'doc_identity_type',
             'document_number',
+            'address',
+            'department',
+            'province',
+            'district',
+            'telephone',
             'is_active',
-            'department_id',
-            'province_id',
-            'district_id',
         ],
         Company::class => [
             'company_name',
@@ -122,19 +91,9 @@ test('models define expected fillable attributes', function () {
             'logo_path',
             'production',
             'ubigueo',
-            'department_id',
-            'province_id',
-            'district_id',
-        ],
-        CreditQuota::class => [
-            'document_type',
-            'number',
-            'date_expiration',
-            'date_paid',
-            'total_to_pay',
-            'total_paid',
-            'is_active',
-            'sale_document_id',
+            'department',
+            'province',
+            'district',
         ],
         Department::class => [
             'code',
@@ -147,26 +106,13 @@ test('models define expected fillable attributes', function () {
             'is_active',
             'province_id',
         ],
-        Pack::class => [
-            'name',
-            'price',
-            'is_active',
-        ],
-        PackItem::class => [
-            'quantity',
-            'price',
-            'is_active',
-            'pack_id',
-            'product_id',
-        ],
-        Payment::class => [
-            'document_type',
-            'date',
-            'amount',
-            'note',
+        Discount::class => [
+            'type',
+            'base_amount',
+            'factor_porcentage',
+            'discount_amount',
             'sale_document_id',
-            'payment_method_id',
-            'credit_quota_id',
+            'sale_document_item_id',
         ],
         PaymentMethod::class => [
             'document_type',
@@ -178,6 +124,7 @@ test('models define expected fillable attributes', function () {
         Product::class => [
             'name',
             'unit',
+            'sku',
             'price',
             'is_active',
         ],
@@ -221,8 +168,8 @@ test('models define expected fillable attributes', function () {
             'date_expiration',
             'additional_info',
             'status',
-            'company_id',
             'client_id',
+            'company_id',
         ],
         SaleDocumentItem::class => [
             'code',
@@ -243,11 +190,12 @@ test('models define expected fillable attributes', function () {
             'sale_document_id',
         ],
         Serie::class => [
-            'document_type',
+            'doc_sunat_type',
             'description',
             'code',
             'correlative',
             'is_active',
+            'company_id',
         ],
     ];
 

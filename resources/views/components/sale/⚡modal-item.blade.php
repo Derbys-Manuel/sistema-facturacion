@@ -230,8 +230,11 @@ new class extends Component
 
 <div class="space-y-0">
     <div class="rounded-sm bg-white p-4 space-y-4">
-
-        {{-- SELECT / INPUT BUSCADOR --}}
+         <div class="border-b border-zinc-100 px-5 py-4">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-800">
+                Datos del producto
+            </h2>
+        </div>
         <div x-data="{ open: false }" class="relative">
             <div
                 class="transition-opacity duration-150"
@@ -338,7 +341,7 @@ new class extends Component
 
             <div>
                 <p class="text-xs font-semibold text-zinc-800">
-                    Base S/ {{ number_format((float) data_get($saleItem->discounts, '0.baseAmount', 0), 2) }}
+                  Descuento sobre la base imponible S/ {{ number_format((float) data_get($saleItem->discounts, '0.baseAmount', 0), 2) }}
                 </p>
             </div>
 
