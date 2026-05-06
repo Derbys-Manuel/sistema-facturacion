@@ -32,6 +32,7 @@
         $fullWidth ? 'w-full' : '',
 
         $size === 'sm' ? 'h-9! px-3! text-xs!' : '',
+        $size === 'xs' ? 'h-7! px-2! text-xs!' : '',
         $size === 'md' ? 'h-10! px-4! text-sm!' : '',
         $size === 'lg' ? 'h-11! px-5! text-sm!' : '',
         $size === 'icon' ? 'h-10! w-10! p-0!' : '',

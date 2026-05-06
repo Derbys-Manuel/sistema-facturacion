@@ -20,6 +20,9 @@ new class extends Component
     public ?string $companyId = null;
     public bool $companyReady = false;
 
+    public bool $pdfPreviewOpen = false;
+    public ?string $pdfPreviewUrl = null;
+
     public function setCompany(?string $companyId = null): void
     {
         $this->companyId = filled($companyId) ? $companyId : null;
@@ -145,6 +148,43 @@ new class extends Component
             default => 'zinc',
         };
     }
+
+    public function openPdfPreview(?string $url = null): void
+    {
+        $this->pdfPreviewUrl = filled($url) ? $url : null;
+        $this->pdfPreviewOpen = filled($this->pdfPreviewUrl);
+    }
+
+    public function closePdfPreview(): void
+    {
+        $this->pdfPreviewOpen = false;
+        $this->pdfPreviewUrl = null;
+    }
+
+    public function previewPdf(?string $saleId = null): void
+    {
+        if (blank($saleId)) {
+            $this->openPdfPreview(null);
+
+            return;
+        }
+
+        $this->openPdfPreview(route('sale.pdf', $saleId));
+    }
+
+    public function startNewInvoice(): void
+    {
+        $this->closePdfPreview();
+
+        $this->redirectRoute('create-factura', navigate: true);
+    }
+
+    public function goToVouchers(): void
+    {
+        $this->closePdfPreview();
+
+        $this->redirectRoute('vouchers', navigate: true);
+    }
 };
 ?>
 <div>
@@ -238,15 +278,13 @@ new class extends Component
                 </x-ui.table.cell>
 
                 <x-ui.table.cell>
-                    <div class="flex items-center justify-end gap-2">
-                        <button
-                            type="button"
-                            class="rounded-md border border-zinc-200 bg-white px-2 py-0 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50"
-                        >
-                            Ver
-                        </button>
-
-                    </div>
+                    <x-form.button
+                        variant="success"
+                        size="xs"
+                        type="button"
+                        leftIcon="document"
+                        wire:click="previewPdf('{{ $row['id'] }}')"
+                    />
                 </x-ui.table.cell>
             </tr>
         @empty
@@ -286,9 +324,7 @@ new class extends Component
     <x-sale.pdf-preview-modal
         :open="$pdfPreviewOpen"
         :url="$pdfPreviewUrl"
-        new-label="Ingresar nueva factura"
-        new-action="startNewInvoice"
-        list-action="goToVouchers"
+        :show-footer-actions="false"
     />
 </div>
 @script
