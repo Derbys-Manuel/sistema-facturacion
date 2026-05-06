@@ -1,80 +1,107 @@
 <?php
 
+use App\Enums\Sunat\AffecType;
 use App\Enums\Sunat\DocIdentityType;
 use App\Enums\Sunat\DocSunatType;
-use App\Enums\Sunat\OperationType;
-use App\Enums\Sunat\PaymentForm;
 use App\Models\Client;
 use App\Models\Company;
-use App\Models\Department;
-use App\Models\District;
-use App\Models\Province;
+use App\Models\SaleDocument;
+use App\Models\Serie;
+use App\Services\SunatService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-it('creates a sale document from the create modal', function () {
-    $department = Department::create([
-        'code' => '99',
-        'description' => 'Test Department',
-    ]);
-
-    $province = Province::create([
-        'description' => 'Test Province',
-        'code' => '9901',
-        'department_id' => $department->id,
-    ]);
-
-    $district = District::create([
-        'description' => 'Test District',
-        'code' => '990101',
-        'province_id' => $province->id,
-    ]);
+it('creates a sale document from the boleta page', function () {
+    app()->instance(SunatService::class, new class extends SunatService
+    {
+        public function send(array $data, SaleDocument $sale): array
+        {
+            return [
+                'success' => true,
+                'xml' => '<xml/>',
+                'hash' => 'hash',
+                'pdfUrl' => route('sale.pdf', $sale->id),
+                'sunatResponse' => [
+                    'success' => true,
+                    'error' => null,
+                ],
+                'error' => null,
+            ];
+        }
+    });
 
     $company = Company::create([
         'company_name' => 'Test Company SAC',
         'ruc' => '20123456789',
         'sol_user' => 'TEST',
         'sol_pass' => 'TEST',
-        'department_id' => $department->id,
-        'province_id' => $province->id,
-        'district_id' => $district->id,
+        'department' => 'LIMA',
+        'province' => 'LIMA',
+        'district' => 'LIMA',
+    ]);
+
+    Serie::create([
+        'doc_sunat_type' => DocSunatType::BOLETA->value,
+        'description' => 'Boleta',
+        'code' => 'B001',
+        'correlative' => '00000001',
+        'is_active' => true,
+        'company_id' => $company->id,
     ]);
 
     $client = Client::create([
-        'name' => 'Juan',
-        'last_name' => 'Pérez',
+        'name' => 'Juan Perez',
         'trade_name' => null,
-        'address' => null,
-        'email' => null,
-        'telephone' => null,
         'doc_identity_type' => DocIdentityType::DNI->value,
         'document_number' => '12345678',
-        'department_id' => $department->id,
-        'province_id' => $province->id,
-        'district_id' => $district->id,
+        'address' => null,
+        'department' => 'LIMA',
+        'province' => 'LIMA',
+        'district' => 'LIMA',
+        'telephone' => null,
+        'is_active' => true,
     ]);
 
-    Livewire::test('sale.create')
-        ->set('sale.company_id', $company->id)
-        ->set('sale.client_id', $client->id)
-        ->set('sale.doc_sunat_type', DocSunatType::BOLETA->value)
-        ->set('sale.operation_type', OperationType::INTERNAL_SALE->value)
-        ->set('sale.payment_form', PaymentForm::CASH->value)
-        ->set('sale.currency', 'PEN')
-        ->set('sale.serie', 'V001')
-        ->set('sale.correlative', '00000001')
-        ->set('sale.date_issue', now()->toDateString())
-        ->set('sale.date_expiration', now()->toDateString())
+    $items = [
+        [
+            'igvAffectationType' => AffecType::GRAVADO->value,
+            'code' => 'P001',
+            'description' => 'Producto',
+            'unit' => 'NIU',
+            'quantity' => 1,
+            'unitValue' => 100,
+            'itemValue' => 100,
+            'unitPrice' => 118,
+            'igvBaseAmount' => 100,
+            'igvPercent' => 18,
+            'igvAmount' => 18,
+            'taxesTotal' => 18,
+            'discounts' => [],
+            'total' => 118,
+        ],
+    ];
+
+    Livewire::test('pages::sale.create-boleta')
+        ->set('sale.companyId', (string) $company->id)
+        ->set('sale.clientId', (string) $client->id)
+        ->set('items', $items)
         ->call('save')
-        ->assertDispatched('modal-close', name: 'sale-create');
+        ->assertSet('pdfPreviewOpen', true);
 
     $this->assertDatabaseHas('sale_documents', [
         'company_id' => $company->id,
         'client_id' => $client->id,
-        'serie' => 'V001',
-        'correlative' => '00000001',
-        'currency' => 'PEN',
+        'doc_sunat_type' => DocSunatType::BOLETA->value,
+        'serie' => 'B001',
+        'correlative' => '00000002',
+    ]);
+
+    $saleDocumentId = SaleDocument::query()->value('id');
+
+    $this->assertDatabaseHas('sale_document_items', [
+        'sale_document_id' => $saleDocumentId,
+        'code' => 'P001',
     ]);
 });

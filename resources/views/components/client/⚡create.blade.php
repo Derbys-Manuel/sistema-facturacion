@@ -3,6 +3,7 @@
 use App\Enums\Sunat\DocIdentityType;
 use App\Livewire\Forms\ClientForm;
 use Livewire\Component;
+use App\Services\IdentityDiurvanService;
 use Flux\Flux;
 
 new class extends Component
@@ -48,6 +49,11 @@ new class extends Component
     {
         $this->dispatch('modal-close', name: 'client-create');
         $this->client->reset();
+    }
+
+    public function consultDocument(IdentityDiurvanService $identityService): ?array
+    {
+        return $this->client->consultDocument($identityService);
     }
 
     public function save(): void
@@ -126,7 +132,7 @@ new class extends Component
                     wire:model.defer="client.documentNumber"
                     placeholder="Ingresa el número"
                     icon-left="hashtag"
-                    {{-- action-right-icon="search" --}}
+                    action-right-icon="magnifying-glass"
                     action-right-click="consultDocument"
                     action-right-target="consultDocument"
                     :error="$errors->first('client.documentNumber')"
@@ -166,8 +172,40 @@ new class extends Component
             />
         </div>
 
-        <div class="flex justify-end gap-2 border-t border-zinc-100 pt-4">
+        <div class="grid grid-cols-2 gap-3">
+            <x-form.input
+                label="Departamento"
+                wire:model.defer="client.department"
+                placeholder="Ingresa el departamento"
+                icon-left="map-pin"
+                :error="$errors->first('client.department')"
+            />
 
+            <x-form.input
+                label="Provincia"
+                wire:model.defer="client.province"
+                placeholder="Ingresa la provincia"
+                icon-left="map-pin"
+                :error="$errors->first('client.province')"
+            />
+
+            <x-form.input
+                label="Distrito"
+                wire:model.defer="client.district"
+                placeholder="Ingresa el distrito"
+                icon-left="map-pin"
+                :error="$errors->first('client.district')"
+            />
+
+            <x-form.input
+                label="Telefono"
+                wire:model.defer="client.telephone"
+                placeholder="Ingresa el telefono"
+                icon-left="phone"
+                :error="$errors->first('client.telephone')"
+            />
+        </div>
+        <div class="flex justify-end gap-2 border-t border-zinc-100 pt-4">
             <x-form.button
                 type="button"
                 variant="ghost"

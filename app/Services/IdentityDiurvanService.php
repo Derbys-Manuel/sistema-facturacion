@@ -7,32 +7,71 @@ use Illuminate\Support\Facades\Http;
 class IdentityDiurvanService
 {
     private string $baseUrl;
+
     private string $apiKey;
 
     public function __construct()
     {
-        $this->baseUrl = rtrim(config('services.diurvan.url'), '/');
-        $this->apiKey = config('services.diurvan.key');
+        $this->baseUrl = rtrim((string) config('services.diurvan.url'), '/');
+        $this->apiKey = (string) config('services.diurvan.key');
     }
 
     public function searchDni(string $dni): array
     {
-        return $this->request('/dni/' . $dni);
+        return $this->request($dni);
     }
 
     public function searchRuc(string $ruc): array
     {
-        return $this->request('/ruc/' . $ruc);
+        return $this->request($ruc);
     }
 
-    private function request(string $endpoint): array
+    private function request(string $document): array
     {
+        if ($this->baseUrl === '' || $this->apiKey === '') {
+            return [
+                'success' => false,
+                'message' => 'Falta configurar el servicio de identidad (URL o API key).',
+                'status' => 500,
+                'data' => null,
+            ];
+        }
+
+        // Soportamos dos formatos:
+        // - Diurvan: POST {baseUrl}/dniruc {documento: "..."} con Bearer token
+        // - Decolecta (si se configura baseUrl): GET {baseUrl}/ruc?numero=... con Bearer token
+        if (str_contains($this->baseUrl, 'api.decolecta.com')) {
+            $response = Http::timeout(15)
+                ->acceptJson()
+                ->withToken($this->apiKey)
+                ->get($this->baseUrl.'/ruc', [
+                    'numero' => $document,
+                ]);
+
+            if (! $response->successful()) {
+                return [
+                    'success' => false,
+                    'message' => $response->json('message') ?? 'No se pudo consultar la API.',
+                    'status' => $response->status(),
+                    'data' => null,
+                ];
+            }
+
+            return [
+                'success' => true,
+                'message' => null,
+                'status' => $response->status(),
+                'data' => $response->json(),
+            ];
+        }
+
         $response = Http::timeout(15)
             ->acceptJson()
-            ->withHeaders([
-                'Authorization' => 'Bearer ' . $this->apiKey,
-            ])
-            ->get($this->baseUrl . $endpoint);
+            ->asJson()
+            ->withToken($this->apiKey)
+            ->post($this->baseUrl.'/dniruc', [
+                'documento' => $document,
+            ]);
 
         if (! $response->successful()) {
             return [
@@ -40,6 +79,17 @@ class IdentityDiurvanService
                 'message' => $response->json('message') ?? 'No se pudo consultar la API.',
                 'status' => $response->status(),
                 'data' => null,
+            ];
+        }
+
+        $jsonSuccess = (bool) $response->json('success', true);
+
+        if (! $jsonSuccess) {
+            return [
+                'success' => false,
+                'message' => $response->json('message') ?? 'No se pudo consultar la API.',
+                'status' => $response->status(),
+                'data' => $response->json(),
             ];
         }
 

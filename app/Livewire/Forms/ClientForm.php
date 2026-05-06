@@ -4,8 +4,9 @@ namespace App\Livewire\Forms;
 
 use App\Enums\Sunat\DocIdentityType;
 use App\Models\Client;
-use Livewire\Form;
+use App\Models\District;
 use App\Services\IdentityDiurvanService;
+use Livewire\Form;
 
 class ClientForm extends Form
 {
@@ -17,6 +18,16 @@ class ClientForm extends Form
 
     public $documentNumber = '';
 
+    public $address = null;
+
+    public $department = null;
+
+    public $province = null;
+
+    public $district = null;
+
+    public $telephone = null;
+
     public $isActive = true;
 
     public function rules(): array
@@ -25,18 +36,34 @@ class ClientForm extends Form
             'name' => ['nullable', 'string', 'max:255'],
             'tradeName' => ['nullable', 'string', 'max:255'],
             'docIdentityType' => ['required'],
-            'isActive' => ['boolean'],
             'documentNumber' => $this->documentRules(),
+            'address' => ['nullable', 'string', 'max:255'],
+            'department' => ['nullable', 'string', 'max:255'],
+            'province' => ['nullable', 'string', 'max:255'],
+            'district' => ['nullable', 'string', 'max:255'],
+            'telephone' => ['nullable', 'string', 'max:20'],
+            'isActive' => ['boolean'],
         ];
     }
 
     protected function documentRules(): array
     {
         return match ($this->docIdentityType?->value ?? $this->docIdentityType) {
-            DocIdentityType::DNI->value => ['required', 'digits:8'],   // DNI
-            DocIdentityType::RUC->value => ['required', 'digits:11'],  // RUC
+            DocIdentityType::DNI->value => ['required', 'digits:8'],
+            DocIdentityType::RUC->value => ['required', 'digits:11'],
             default => ['required', 'max:20'],
         };
+    }
+
+    protected function normalizeString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value === '' ? null : $value;
     }
 
     public function consultDocument(IdentityDiurvanService $identityService)
@@ -53,12 +80,69 @@ class ClientForm extends Form
             return;
         }
 
-        $data = $response['data'];
+        $data = $response['data'] ?? [];
 
-        // Ajusta estos campos según la respuesta real de la API.
-        $this->name = $data['nombres'] ?? $data['nombre'] ?? null;
-        $this->tradeName = $data['razonSocial'] ?? $data['razon_social'] ?? null;
-        $this->address = $data['direccion'] ?? null;
+        if (is_array($data) && array_key_exists('message', $data) && is_array($data['message'])) {
+            $data = $data['message'];
+        }
+
+        $docIdentityType = $this->docIdentityType instanceof DocIdentityType
+            ? $this->docIdentityType->value
+            : $this->docIdentityType;
+
+        $nombres = $this->normalizeString($data['nombres'] ?? null);
+        $nombre = $this->normalizeString($data['nombre'] ?? null);
+        $nombreCompleto = $this->normalizeString($data['nombre_completo'] ?? null);
+
+        $razonSocialCamel = $this->normalizeString($data['razonSocial'] ?? null);
+        $razonSocialSnake = $this->normalizeString($data['razon_social'] ?? null);
+
+        if ($docIdentityType === DocIdentityType::RUC->value) {
+            // Para RUC la razón social (RegistrationName) debe ir en `tradeName`.
+            $this->tradeName = $razonSocialCamel ?? $razonSocialSnake ?? $nombreCompleto ?? $this->tradeName;
+            $this->name = null;
+        } else {
+            $this->name = $nombres ?? $nombre ?? $nombreCompleto ?? $this->name;
+            $this->tradeName = $razonSocialCamel ?? $razonSocialSnake ?? $this->tradeName;
+        }
+
+        $this->address = $data['direccion'] ?? $data['dirección'] ?? null;
+        $this->department = $data['departamento'] ?? null;
+        $this->province = $data['provincia'] ?? null;
+        $this->district = $data['distrito'] ?? null;
+
+        $ubigeo = $data['ubigeo'] ?? null;
+
+        if (filled($ubigeo) && (blank($this->department) || blank($this->province) || blank($this->district))) {
+            $ubigeo = trim((string) $ubigeo);
+
+            if (preg_match('/^\d{6}$/', $ubigeo) === 1) {
+                $district = District::query()
+                    ->where('code', $ubigeo)
+                    ->with('province.department')
+                    ->first();
+
+                if ($district) {
+                    $this->district = $this->district ?? $district->description;
+                    $this->province = $this->province ?? $district->province?->description;
+                    $this->department = $this->department ?? $district->province?->department?->description;
+                }
+            } elseif (str_contains($ubigeo, '-')) {
+                [, $names] = explode('-', $ubigeo, 2);
+                $parts = collect(explode('/', (string) $names))
+                    ->map(fn ($value) => trim((string) $value))
+                    ->filter(fn ($value) => $value !== '')
+                    ->values()
+                    ->all();
+
+                $this->department = $this->department ?? ($parts[0] ?? null);
+                $this->province = $this->province ?? ($parts[1] ?? null);
+                $this->district = $this->district ?? ($parts[2] ?? null);
+            }
+        }
+
+        $this->telephone = $data['telefono'] ?? $data['telephone'] ?? null;
+
         return $data;
     }
 
@@ -71,12 +155,18 @@ class ClientForm extends Form
             : $this->docIdentityType;
 
         $client = Client::create([
-            'name' => $this->name,
-            'trade_name' => $this->tradeName,
+            'name' => $this->normalizeString($this->name),
+            'trade_name' => $this->normalizeString($this->tradeName),
             'doc_identity_type' => $docIdentityType,
             'document_number' => $this->documentNumber,
+            'address' => $this->normalizeString($this->address),
+            'department' => $this->normalizeString($this->department),
+            'province' => $this->normalizeString($this->province),
+            'district' => $this->normalizeString($this->district),
+            'telephone' => $this->normalizeString($this->telephone),
             'is_active' => (bool) $this->isActive,
         ]);
+
         return $client->toArray();
     }
 
@@ -98,6 +188,7 @@ class ClientForm extends Form
             ])
             ->toArray();
     }
+
     public function searchWithoutDni($q)
     {
         return Client::query()

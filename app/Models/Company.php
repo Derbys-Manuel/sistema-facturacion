@@ -57,6 +57,11 @@ class Company extends BaseModel
         return $this->hasMany(SaleDocument::class);
     }
 
+    public function paymentMethods(): HasMany
+    {
+        return $this->hasMany(PaymentMethod::class);
+    }
+
     public function series(): HasMany
     {
         return $this->hasMany(Serie::class);
