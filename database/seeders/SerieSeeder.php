@@ -40,7 +40,7 @@ class SerieSeeder extends Seeder
                 'doc_sunat_type' => DocSunatType::FACTURA->value,
                 'description' => 'Factura',
                 'code' => "F00$number",
-                'correlative' => '00000002',
+                'correlative' => '00000000',
                 'is_active' => true,
                 'created_at' => $now,
                 'updated_at' => $now,
