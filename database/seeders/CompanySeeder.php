@@ -18,7 +18,7 @@ class CompanySeeder extends Seeder
             'sol_user' => config('services.sunat-nexara.sol_user'),
             'sol_pass' => config('services.sunat-nexara.sol_pass'),
             'cert_path' => 'app/private/certificado.pem',
-            'logo_path' => 'logos/eunoia.png',
+            'logo_path' => 'app/private/logo-eunoia.png',
             'production' => true,
             'ubigueo' => '200101',
             'department' => 'PIURA',
@@ -26,7 +26,7 @@ class CompanySeeder extends Seeder
             'district' => 'PIURA',
         ]);
         Company::query()->create([
-            'company_name' => 'ANONIMA CERRADA',
+            'company_name' => 'ANONIMA CERRADA PRUEBAS',
             'ruc' => '20615778206',
             'urbanization' => '-',
             'address' => 'URB. SANTA MARIA',
@@ -34,7 +34,7 @@ class CompanySeeder extends Seeder
             'sol_user' => 'USUARIO-PRUEBA',
             'sol_pass' => 'usuario-prueba',
             'cert_path' => 'app/private/certificado-prueba.pem',
-            'logo_path' => 'logos/eunoia.png',
+            'logo_path' => 'app/private/logo-eunoia.png',
             'production' => false,
             'ubigueo' => '200101',
             'department' => 'PIURA',

@@ -7,12 +7,13 @@
     'newLabel' => 'Ingresar nuevo',
     'listAction' => 'goToVouchers',
     'listLabel' => 'Ir a listado',
+    'showFooterActions' => true,
 ])
 
 @if ($open)
     <div
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-        wire:click.self="{{ $newAction }}"
+        wire:click.self="{{ $closeAction }}"
         x-data="{ leaving: false }"
         :class="leaving ? 'cursor-wait' : ''"
     >
@@ -25,7 +26,7 @@
                     variant="ghost"
                     size="sm"
                     type="button"
-                    wire:click="{{ $newAction }}"
+                    wire:click="{{ $closeAction }}"
                 >
                     Cerrar
                 </x-form.button>
@@ -55,42 +56,49 @@
                     @endif
                 </div>
 
-                <div class="flex flex-col sm:flex-row gap-3">
-                    <x-form.button
-                        variant="ghost"
-                        type="button"
-                        class="flex-1 bg-gray-200"
-                        wire:click="{{ $newAction }}"
-                    >
-                        {{ $newLabel }}
-                    </x-form.button>
-                    <x-form.button
-                        variant="success"
-                        type="button"
-                        class="flex-1 inline-flex items-center justify-center gap-2 min-h-10"
-                        wire:loading.attr="none"
-                        wire:target="{{ $listAction }}"
-                        wire:click="{{ $listAction }}"
-                        x-on:click="leaving = true"
-                        x-bind:disabled="leaving"
-                    >
-                        <span
-                            class="inline-flex items-center justify-center"
-                            x-show="! leaving"
-                            x-cloak
-                        >
-                            {{ $listLabel }}
-                        </span>
-                        <span
-                            class="inline-flex items-center justify-center gap-2"
-                            x-show="leaving"
-                            x-cloak
-                        >
-                            <flux:icon.loading class="size-4 animate-spin" />
-                            <span>Espere...</span>
-                        </span>
-                    </x-form.button>
-                </div>
+                @if ($showFooterActions)
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        @if (filled($newAction) && filled($newLabel))
+                            <x-form.button
+                                variant="ghost"
+                                type="button"
+                                class="flex-1 bg-gray-200"
+                                wire:click="{{ $newAction }}"
+                            >
+                                {{ $newLabel }}
+                            </x-form.button>
+                        @endif
+
+                        @if (filled($listAction) && filled($listLabel))
+                            <x-form.button
+                                variant="success"
+                                type="button"
+                                class="flex-1 inline-flex items-center justify-center gap-2 min-h-10"
+                                wire:loading.attr="none"
+                                wire:target="{{ $listAction }}"
+                                wire:click="{{ $listAction }}"
+                                x-on:click="leaving = true"
+                                x-bind:disabled="leaving"
+                            >
+                                <span
+                                    class="inline-flex items-center justify-center"
+                                    x-show="! leaving"
+                                    x-cloak
+                                >
+                                    {{ $listLabel }}
+                                </span>
+                                <span
+                                    class="inline-flex items-center justify-center gap-2"
+                                    x-show="leaving"
+                                    x-cloak
+                                >
+                                    <flux:icon.loading class="size-4 animate-spin" />
+                                    <span>Espere...</span>
+                                </span>
+                            </x-form.button>
+                        @endif
+                    </div>
+                @endif
             </div>
         </div>
     </div>

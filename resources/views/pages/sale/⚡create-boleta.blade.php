@@ -32,8 +32,8 @@ new class extends Component
     public function mount(): void
     {
         $this->sale->docSunatType = DocSunatType::BOLETA->value;
-        $this->sale->dateIssue = now()->format('d-m-Y H:i:s');
-        $this->sale->dateExpiration = now()->format('d-m-Y H:i:s');
+        $this->sale->dateIssue = now('America/Lima')->format('Y-m-d H:i:s');
+        $this->sale->dateExpiration = now('America/Lima')->format('Y-m-d H:i:s');
     }
 
     public function editItem(int $index): void
@@ -137,8 +137,8 @@ new class extends Component
         $this->bolClient = 'hide';
         $this->selectedClientLabel = null;
 
-        $this->sale->dateIssue = now()->format('Y-m-d H:i:s');
-        $this->sale->dateExpiration = now()->format('Y-m-d H:i:s');
+        $this->sale->dateIssue = now('America/Lima')->format('Y-m-d H:i:s');
+        $this->sale->dateExpiration = now('America/Lima')->format('Y-m-d H:i:s');
         $this->sale->docSunatType = DocSunatType::BOLETA->value;
         $this->sale->discounts = [];
     }
@@ -246,8 +246,8 @@ new class extends Component
 };
 ?>
 <div>
-    <div class="grid gap-4 grid-cols-[4fr_2.5fr] h-[88vh] overflow-hidden">
-        <section class="flex flex-col overflow-hidden rounded-sm bg-white">
+    <div class="grid gap-4 grid-cols-[4fr_2.5fr] h-[88vh] overflow-auto scrollbar-thin-stable">
+        <section class="flex flex-col overflow-auto rounded-sm bg-white scrollbar-thin-stable">
             <div class="space-y-3 mb-2">
                 <div class="flex justify-end">
                     <flux:modal.trigger name="sale-item">
@@ -380,7 +380,7 @@ new class extends Component
             </div>
         </section>
         <form wire:submit.prevent="save" class="contents" id="sale-form">
-            <aside class="flex flex-col overflow-hidden rounded-sm shadow-inner border border-zinc-200/80 bg-white">
+            <aside class="scrollbar-thin-stable flex flex-col overflow-auto rounded-sm shadow-inner border border-zinc-200/80 bg-white">
                 <div class="bg-gray-100/70 px-5 py-4 backdrop-blur">
                     <div class="flex items-center gap-3">
                         <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100/80 text-emerald-700 ring-1 ring-sky-200/50">
@@ -405,7 +405,6 @@ new class extends Component
                             ['value' => 'hide', 'label' => 'Sin cliente', 'icon' => 'user-x'],
                         ]"
                     />
-
                     <div
                         x-show="$wire.bolClient === 'show'"
                         x-cloak
@@ -436,66 +435,18 @@ new class extends Component
                             />
                         </flux:modal.trigger>
                     </div>
-
                     <x-form.input
-                        label="Información adicional"
-                        wire:model="sale.additionalInfo"
-                        placeholder="Ingresa información"
-                        icon-left="document-text"
-                        :error="$errors->first('sale.additionalInfo')"
+                    label="Información adicional"
+                    wire:model="sale.additionalInfo"
+                    placeholder="Ingresa información"
+                    icon-left="document-text"
+                    :error="$errors->first('sale.additionalInfo')"
                     />
-
-                    {{-- <div class="space-y-2">
-                        <button
-                            type="button"
-                            wire:click="toggleGlobalDiscount"
-                            class="w-full rounded-sm border border-zinc-200 bg-white px-3 py-2 text-left text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 flex items-center justify-between"
-                        >
-                            <span class="inline-flex items-center gap-2">
-                                <flux:icon name="tag" class="size-4 text-emerald-700" />
-                                Descuento global
-                            </span>
-
-                            @if (data_get($sale->discounts, '0.enabled', false))
-                                <flux:icon name="check" class="size-4 text-emerald-700" />
-                            @endif
-                        </button>
-
-                        @if (data_get($sale->discounts, '0.enabled', false))
-                            <div class="rounded-sm border border-emerald-200 bg-emerald-50/40 p-3 space-y-2">
-                                <div class="flex items-center justify-between text-xs text-zinc-600">
-                                    <span>Base</span>
-                                    <span class="font-mono font-semibold tabular-nums">
-                                        S/ {{ number_format((float) ($sale->saleValue ?? 0), 2) }}
-                                    </span>
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-2">
-                                    <x-form.input
-                                        label="%"
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        wire:model.blur="sale.discounts.0.uiPercent"
-                                        wire:blur="recalculateGlobalDiscountFromPercent"
-                                        placeholder="0.00"
-                                        :error="$errors->first('sale.discounts.0.uiPercent')"
-                                    />
-
-                                    <x-form.input
-                                        label="S/"
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        wire:model.blur="sale.discounts.0.discountAmount"
-                                        wire:blur="recalculateGlobalDiscountFromAmount"
-                                        placeholder="0.00"
-                                        :error="$errors->first('sale.discounts.0.discountAmount')"
-                                    />
-                                </div>
-                            </div>
-                        @endif
-                    </div> --}}
+                    <x-form.date
+                        label="Fecha de emisión"
+                        wire:model="sale.dateIssue"
+                        :error="$errors->first('sale.dateIssue')"
+                    />
                 </div>
 
                 <div class="bg-gray-100/70 px-4 py-3">
