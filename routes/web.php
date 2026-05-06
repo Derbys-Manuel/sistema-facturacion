@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\InvoiceController;
 
-Route::redirect('/', '/dashboard')->name('home');
+Route::get('/', fn () => redirect()->route('vouchers'))->name('home');
 
 Route::view('dashboard', 'dashboard')->name('dashboard');
 
