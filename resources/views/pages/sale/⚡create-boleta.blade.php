@@ -103,9 +103,9 @@ new class extends Component
         if (filled($label)) {
             if (str_contains($label, ' - ')) {
                 [$name, $documentNumber] = explode(' - ', $label, 2);
-                $label = Str::limit(trim($name), 15, '...') . ' - ' . trim($documentNumber);
+                $label = Str::limit(trim($name), 12, '...') . ' - ' . trim($documentNumber);
             } else {
-                $label = Str::limit($label, 15, '...');
+                $label = Str::limit($label, 12, '...');
             }
         }
 
@@ -172,7 +172,7 @@ new class extends Component
     {
         $id = $client['id'];
         $label = ($client['name'] ?: $client['tradeName']);
-        $label = Str::limit($label, 15, '...');
+        $label = Str::limit($label, 12, '...');
         $label = $label . ' - ' . $client['documentNumber'];
 
         $this->sale->clientId = $id;
@@ -191,6 +191,10 @@ new class extends Component
         $this->items[] = $item;
         $saleService->applyTotals($this->sale, $this->items);
         $this->dispatch('reset-sale-item-modal');
+    }
+    #[On('pdf-modal-closed')]
+    public function resetFromModal(){
+        $this->resetForm();
     }
 
     #[On('sale-item-updated')]
