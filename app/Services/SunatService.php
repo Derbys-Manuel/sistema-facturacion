@@ -114,13 +114,20 @@ class SunatService
             ->setNombreComercial($company->company_name ?? null)
             ->setAddress($this->getAddress($company) ?? null);
     }
-    public function getClient(ClientModels $client = null)
+    public function getClient(?ClientModels $client = null): Client
     {
+        if ($client === null) {
+            return (new Client())
+                ->setTipoDoc(DocIdentityType::DNI->value)
+                ->setNumDoc('00000000')
+                ->setRznSocial('CLIENTE-VARIOS');
+        }
         return (new Client())
-            ->setTipoDoc($client->doc_identity_type->value ?? DocIdentityType::DNI->value) // DNI - Catalog. 06
-            ->setNumDoc($client->document_number ?? "00000000")
-            ->setRznSocial($client->name ?? $client->trade_name ?? "CLIENTE-VARIOS");
+            ->setTipoDoc($client->doc_identity_type->value ?? DocIdentityType::DNI->value)
+            ->setNumDoc($client->document_number ?? '00000000')
+            ->setRznSocial($client->name ?? $client->trade_name ?? 'CLIENTE-VARIOS');
     }
+
 
     public function getAddress(CompanyModels $company)
     {

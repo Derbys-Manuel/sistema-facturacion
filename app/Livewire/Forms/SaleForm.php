@@ -23,7 +23,7 @@ class SaleForm extends Form
     public $documentType = DocumentType::SALE->value;
 
     #[Validate('nullable|string|max:5')]
-    public $ubl_version = '2.1';
+    public $ublVersion = '2.1';
 
     #[Validate('required')]
     public $docSunatType = '';
@@ -102,7 +102,7 @@ class SaleForm extends Form
 
     #[Validate('nullable|string')]
     public ?string $clientId = null;
-    #[Validate('required|array|min:1')]
+    #[Validate('nullable|array|min:1')]
     public array $items = [];
 
     #[Validate('nullable|array')]
@@ -121,7 +121,6 @@ class SaleForm extends Form
             'dateExpiration.required' => 'La fecha de vencimiento es obligatoria.',
 
             'companyId.required' => 'Debe seleccionar una empresa.',
-            'clientId.required' => 'Debe seleccionar un cliente.',
 
             'items.required' => 'Debe agregar productos.',
             'items.min' => 'Debe agregar al menos un producto.',
