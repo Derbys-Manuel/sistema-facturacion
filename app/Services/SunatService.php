@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Enums\Sunat\DocIdentityType;
-use App\Livewire\Forms\SaleForm;
 use Greenter\Model\Sale\Charge;
 use App\Models\SaleDocument;
 use App\Models\Client as ClientModels;
@@ -21,7 +20,6 @@ use Greenter\Report\PdfReport;
 use Greenter\Report\Resolver\DefaultTemplateResolver;
 use Greenter\See;
 use Greenter\Ws\Services\SunatEndpoints;
-use Illuminate\Support\Facades\Storage;
 use Luecano\NumeroALetras\NumeroALetras;
 use Greenter\Report\XmlUtils;
 
@@ -114,13 +112,20 @@ class SunatService
             ->setNombreComercial($company->company_name ?? null)
             ->setAddress($this->getAddress($company) ?? null);
     }
-    public function getClient(ClientModels $client = null)
+    public function getClient(?ClientModels $client = null): Client
     {
+        if ($client === null) {
+            return (new Client())
+                ->setTipoDoc(DocIdentityType::DNI->value)
+                ->setNumDoc('00000000')
+                ->setRznSocial('CLIENTE-VARIOS');
+        }
         return (new Client())
-            ->setTipoDoc($client->doc_identity_type->value ?? DocIdentityType::DNI->value) // DNI - Catalog. 06
-            ->setNumDoc($client->document_number ?? "00000000")
-            ->setRznSocial($client->name ?? $client->trade_name ?? "CLIENTE-VARIOS");
+            ->setTipoDoc($client->doc_identity_type->value ?? DocIdentityType::DNI->value)
+            ->setNumDoc($client->document_number ?? '00000000')
+            ->setRznSocial($client->name ?? $client->trade_name ?? 'CLIENTE-VARIOS');
     }
+
 
     public function getAddress(CompanyModels $company)
     {
@@ -221,29 +226,14 @@ class SunatService
 
     public function getHtmlReport(Invoice $invoice, ?CompanyModels $company = null, ?string $hash = null): string
     {
-        $report = new HtmlReport();
+        $report = new HtmlReport(resource_path('templates'));
         $resolver = new DefaultTemplateResolver();
         $report->setTemplate($resolver->getTemplate($invoice));
-        $params = [
-            'system' => [
-                // 'logo' => Storage::get($company->logo_path), // Logo de Empresa
-                'hash' => 'qqnr2dN4p/HmaEA/CJuVGo7dv5g=', // Valor Resumen 
-            ],
-            'user' => [
-                'header'     => 'Telf: <b>(01) 123375</b>', // Texto que se ubica debajo de la dirección de empresa
-                'extras'     => [
-                    // Leyendas adicionales
-                    ['name' => 'CONDICION DE PAGO', 'value' => 'Contado'     ],
-                    // ['name' => 'VENDEDOR'         , 'value' => 'GITHUB SELLER'],
-                ],
-                'footer' => '<p>Nro Resolucion: <b>3232323</b></p>'
-            ]
-        ];
         return $report->render($invoice, $this->reportParams($company, $hash, $invoice->getObservacion()));
     }
     public function generatePdfReport(Invoice $invoice, ?CompanyModels $company = null, ?string $hash = null): string
     {
-        $htmlReport = new HtmlReport();
+        $htmlReport = new HtmlReport(resource_path('templates'));
         $resolver = new DefaultTemplateResolver();
         $htmlReport->setTemplate($resolver->getTemplate($invoice));
         $report = new PdfReport($htmlReport);
@@ -254,21 +244,6 @@ class SunatService
             'page-height' => '29.7cm',
         ]);
         $report->setBinPath(env('WKHTML_PDF_PATH'));
-        $params = [
-            'system' => [
-                // 'logo' => Storage::get($company->logo_path), // Logo de Empresa
-                'hash' => 'qqnr2dN4p/HmaEA/CJuVGo7dv5g=', // Valor Resumen 
-            ],
-            'user' => [
-                'header'     => 'Telf: <b>(01) 123375</b>', // Texto que se ubica debajo de la dirección de empresa
-                'extras'     => [
-                    // Leyendas adicionales
-                    ['name' => 'CONDICION DE PAGO', 'value' => 'Efectivo'     ],
-                    ['name' => 'VENDEDOR'         , 'value' => 'GITHUB SELLER'],
-                ],
-                'footer' => '<p>Nro Resolucion: <b>3232323</b></p>'
-            ]
-        ];
         $pdf = $report->render($invoice, $this->reportParams($company, $hash, $invoice->getObservacion()));
 
         if ($pdf === null) {

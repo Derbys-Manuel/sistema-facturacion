@@ -23,7 +23,7 @@ class SaleForm extends Form
     public $documentType = DocumentType::SALE->value;
 
     #[Validate('nullable|string|max:5')]
-    public $ubl_version = '2.1';
+    public $ublVersion = '2.1';
 
     #[Validate('required')]
     public $docSunatType = '';
@@ -97,7 +97,7 @@ class SaleForm extends Form
     #[Validate('boolean')]
     public $isActive = true;
 
-    #[Validate('nullable|string')]
+    #[Validate('required|string')]
     public ?string $companyId = null;
 
     #[Validate('nullable|string')]
@@ -121,7 +121,6 @@ class SaleForm extends Form
             'dateExpiration.required' => 'La fecha de vencimiento es obligatoria.',
 
             'companyId.required' => 'Debe seleccionar una empresa.',
-            'clientId.required' => 'Debe seleccionar un cliente.',
 
             'items.required' => 'Debe agregar productos.',
             'items.min' => 'Debe agregar al menos un producto.',
@@ -164,7 +163,7 @@ class SaleForm extends Form
             ]);
             $sale = SaleDocument::create([
                 'document_type' => $data['documentType'],
-                'ubl_version' => $data['ubl_version'],
+                'ubl_version' => $data['ublVersion'],
                 'doc_sunat_type' => $data['docSunatType'],
                 'operation_type' => $data['operationType'],
                 'payment_form' => $data['paymentForm'],
@@ -228,14 +227,24 @@ class SaleForm extends Form
             ->all();
 
         $response = $sunatService->send($data, $sale);
-        $sunatSuccess = $response['sunatResponse']['success'] ?? false;
+        $sunatSuccess = (bool) data_get($response, 'sunatResponse.success', false);
+        $sunatErrorCode = data_get($response, 'sunatResponse.error.code');
+        $sunatNotes = data_get($response, 'sunatResponse.cdrResponse.notes', []);
+
+        $status = DocumentStatus::REJECTED->value;
+        if ($sunatSuccess) {
+            $status = is_array($sunatNotes) && count($sunatNotes) > 0
+                ? DocumentStatus::OBSERVED->value
+                : DocumentStatus::APPROVED->value;
+        } elseif ($sunatErrorCode === 'CONNECTION_ERROR') {
+            $status = DocumentStatus::CONNECTION_FAILED->value;
+        }
+
         $sale->update([
             'xml' => $response['xml'] ?? null,
             'hash' => $response['hash'] ?? null,
             'cdr' => $response['sunatResponse'] ?? null,
-            'status' => $sunatSuccess
-                ? DocumentStatus::APPROVED->value
-                : DocumentStatus::REJECTED->value,
+            'status' => $status,
         ]);
         return [
             'saleId' => (string) $sale->id,

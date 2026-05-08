@@ -1,15 +1,12 @@
 <?php
 
-test('home redirects to the dashboard', function () {
-    $response = $this->get('/');
-
-    $response->assertRedirect('/dashboard');
+test('home redirects to vouchers', function () {
+    $this->get('/')
+        ->assertRedirectToRoute('vouchers');
 });
 
 test('guests can visit the dashboard', function () {
-    $response = $this->get('/dashboard');
-
-    $response
+    $this->get('/dashboard')
         ->assertOk()
         ->assertSee('data-flux-sidebar-collapse');
 });

@@ -1,11 +1,8 @@
 <?php
 
 use App\Enums\Sunat\DocIdentityType;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
-
-uses(RefreshDatabase::class);
 
 it('fills client fields when consulting a RUC', function () {
     config()->set('services.diurvan.url', 'https://diurvanconsultores.com/apidiurvan/api');
