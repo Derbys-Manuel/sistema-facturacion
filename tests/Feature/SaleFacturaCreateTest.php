@@ -3,6 +3,7 @@
 use App\Enums\Sunat\AffecType;
 use App\Enums\Sunat\DocIdentityType;
 use App\Enums\Sunat\DocSunatType;
+use App\Enums\DocumentStatus;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\SaleDocument;
@@ -93,6 +94,6 @@ it('creates a sale document from the factura page', function () {
         'doc_sunat_type' => DocSunatType::FACTURA->value,
         'serie' => 'F001',
         'correlative' => '00000001',
+        'status' => DocumentStatus::APPROVED->value,
     ]);
 });
-

@@ -145,6 +145,7 @@ new class extends Component
             'aprobada' => 'emerald',
             'rechazada' => 'red',
             'observada' => 'amber',
+            'conexion_fallida' => 'amber',
             default => 'zinc',
         };
     }
@@ -263,7 +264,11 @@ new class extends Component
                                     {{ data_get($cdr, 'cdrResponse.description', '-') }}
                                 </p>
                             @elseif (is_array($cdr) && data_get($cdr, 'success') === false)
-                                <p class="font-semibold text-white">SUNAT: Rechazado</p>
+                                @if (data_get($cdr, 'error.code') === 'CONNECTION_ERROR')
+                                    <p class="font-semibold text-white">ConexiÃ³n fallida</p>
+                                @else
+                                    <p class="font-semibold text-white">SUNAT: Rechazado</p>
+                                @endif
                                 <p class="text-white">
                                     Código: {{ data_get($cdr, 'error.code', '-') }}
                                 </p>

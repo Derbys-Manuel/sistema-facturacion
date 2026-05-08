@@ -227,14 +227,24 @@ class SaleForm extends Form
             ->all();
 
         $response = $sunatService->send($data, $sale);
-        $sunatSuccess = $response['sunatResponse']['success'] ?? false;
+        $sunatSuccess = (bool) data_get($response, 'sunatResponse.success', false);
+        $sunatErrorCode = data_get($response, 'sunatResponse.error.code');
+        $sunatNotes = data_get($response, 'sunatResponse.cdrResponse.notes', []);
+
+        $status = DocumentStatus::REJECTED->value;
+        if ($sunatSuccess) {
+            $status = is_array($sunatNotes) && count($sunatNotes) > 0
+                ? DocumentStatus::OBSERVED->value
+                : DocumentStatus::APPROVED->value;
+        } elseif ($sunatErrorCode === 'CONNECTION_ERROR') {
+            $status = DocumentStatus::CONNECTION_FAILED->value;
+        }
+
         $sale->update([
             'xml' => $response['xml'] ?? null,
             'hash' => $response['hash'] ?? null,
             'cdr' => $response['sunatResponse'] ?? null,
-            'status' => $sunatSuccess
-                ? DocumentStatus::APPROVED->value
-                : DocumentStatus::REJECTED->value,
+            'status' => $status,
         ]);
         return [
             'saleId' => (string) $sale->id,
