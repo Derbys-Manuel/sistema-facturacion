@@ -1,9 +1,8 @@
 <?php
 
 use Database\Seeders\DatabaseSeeder;
-use Database\Seeders\DepartmentSeeder;
-use Database\Seeders\DistrictSeeder;
-use Database\Seeders\ProvinceSeeder;
+use Database\Seeders\CompanySeeder;
+use Database\Seeders\ProductSeeder;
 use Database\Seeders\SerieSeeder;
 
 test('database seeder calls core seeders', function () {
@@ -12,10 +11,9 @@ test('database seeder calls core seeders', function () {
     $seeder->shouldReceive('call')
         ->once()
         ->with([
-            DepartmentSeeder::class,
-            ProvinceSeeder::class,
-            DistrictSeeder::class,
+            CompanySeeder::class,
             SerieSeeder::class,
+            ProductSeeder::class,
         ]);
 
     $seeder->run();

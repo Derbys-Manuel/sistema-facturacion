@@ -1,63 +1,96 @@
 <?php
 
-use App\Enums\DocumentType;
+use App\Enums\Sunat\DocSunatType;
 use Database\Seeders\SerieSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-test('it seeds default series for each document type', function () {
-    $query = \Mockery::mock();
+test('it seeds default series for each company', function () {
+    $companies = collect([
+        (object) ['id' => '00000000-0000-0000-0000-000000000001'],
+        (object) ['id' => '00000000-0000-0000-0000-000000000002'],
+    ]);
 
-    $query->shouldReceive('upsert')
+    $companiesQuery = \Mockery::mock();
+    $companiesQuery->shouldReceive('select')->once()->with('id')->andReturnSelf();
+    $companiesQuery->shouldReceive('get')->once()->andReturn($companies);
+
+    $seriesQuery = \Mockery::mock();
+    $seriesQuery->shouldReceive('upsert')
         ->once()
         ->with(
-            \Mockery::on(function (array $rows): bool {
-                if (count($rows) !== 3) {
+            \Mockery::on(function (array $rows) use ($companies): bool {
+                if (count($rows) !== ($companies->count() * 4)) {
                     return false;
                 }
 
-                $seriesByCode = collect($rows)->keyBy('code');
+                $required = [
+                    'id',
+                    'company_id',
+                    'doc_sunat_type',
+                    'description',
+                    'code',
+                    'correlative',
+                    'is_active',
+                    'created_at',
+                    'updated_at',
+                ];
 
-                $sale = $seriesByCode->get('V001');
-                $creditNote = $seriesByCode->get('NC01');
-                $debitNote = $seriesByCode->get('ND01');
-
-                if ($sale === null || $creditNote === null || $debitNote === null) {
-                    return false;
-                }
-
-                $required = ['id', 'document_type', 'description', 'code', 'correlative', 'is_active', 'created_at', 'updated_at'];
-
-                foreach ([$sale, $creditNote, $debitNote] as $row) {
+                foreach ($rows as $row) {
                     foreach ($required as $key) {
                         if (! array_key_exists($key, $row)) {
                             return false;
                         }
                     }
 
-                    if (! Str::isUuid($row['id'])) {
+                    if (! Str::isUuid((string) $row['id'])) {
                         return false;
                     }
                 }
 
-                return $sale['document_type'] === DocumentType::SALE->value
-                    && $sale['correlative'] === '00000001'
-                    && $sale['is_active'] === true
-                    && $creditNote['document_type'] === DocumentType::CREDIT_NOTE->value
-                    && $creditNote['correlative'] === '00000001'
-                    && $creditNote['is_active'] === true
-                    && $debitNote['document_type'] === DocumentType::DEBIT_NOTE->value
-                    && $debitNote['correlative'] === '00000001'
-                    && $debitNote['is_active'] === true;
+                $byCompany = collect($rows)->groupBy('company_id');
+
+                foreach ($companies as $i => $company) {
+                    $number = $i + 1;
+
+                    $codes = collect($byCompany->get($company->id, []))
+                        ->keyBy('code');
+
+                    $boleta = $codes->get("B00{$number}");
+                    $factura = $codes->get("F00{$number}");
+                    $notaCredito = $codes->get("FC0{$number}");
+                    $notaDebito = $codes->get("FD0{$number}");
+
+                    if (! $boleta || ! $factura || ! $notaCredito || ! $notaDebito) {
+                        return false;
+                    }
+
+                    if ($boleta['doc_sunat_type'] !== DocSunatType::BOLETA->value || $boleta['correlative'] !== '00000002') {
+                        return false;
+                    }
+
+                    if ($factura['doc_sunat_type'] !== DocSunatType::FACTURA->value || $factura['correlative'] !== '00000000') {
+                        return false;
+                    }
+
+                    if ($notaCredito['doc_sunat_type'] !== DocSunatType::NOTA_CREDITO->value || $notaCredito['correlative'] !== '00000000') {
+                        return false;
+                    }
+
+                    if ($notaDebito['doc_sunat_type'] !== DocSunatType::NOTA_DEBITO->value || $notaDebito['correlative'] !== '00000000') {
+                        return false;
+                    }
+                }
+
+                return true;
             }),
             ['code'],
-            ['document_type', 'description', 'correlative', 'is_active', 'updated_at'],
+            ['doc_sunat_type', 'description', 'correlative', 'is_active', 'updated_at'],
         );
 
-    DB::shouldReceive('table')
-        ->once()
-        ->with('series')
-        ->andReturn($query);
+    DB::shouldReceive('table')->once()->with('companies')->andReturn($companiesQuery);
+    DB::shouldReceive('table')->once()->with('series')->andReturn($seriesQuery);
 
     (new SerieSeeder())->run();
 });
+

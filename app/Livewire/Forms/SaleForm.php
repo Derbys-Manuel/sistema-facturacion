@@ -97,12 +97,12 @@ class SaleForm extends Form
     #[Validate('boolean')]
     public $isActive = true;
 
-    #[Validate('nullable|string')]
+    #[Validate('required|string')]
     public ?string $companyId = null;
 
     #[Validate('nullable|string')]
     public ?string $clientId = null;
-    #[Validate('nullable|array|min:1')]
+    #[Validate('required|array|min:1')]
     public array $items = [];
 
     #[Validate('nullable|array')]
@@ -163,7 +163,7 @@ class SaleForm extends Form
             ]);
             $sale = SaleDocument::create([
                 'document_type' => $data['documentType'],
-                'ubl_version' => $data['ubl_version'],
+                'ubl_version' => $data['ublVersion'],
                 'doc_sunat_type' => $data['docSunatType'],
                 'operation_type' => $data['operationType'],
                 'payment_form' => $data['paymentForm'],

@@ -1,7 +1,6 @@
 <?php
 
 test('returns a successful response', function () {
-    $response = $this->get(route('home'));
-
-    $response->assertRedirect('/dashboard');
+    $this->get(route('home'))
+        ->assertRedirectToRoute('vouchers');
 });
