@@ -2,7 +2,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <style type="text/css">
-        {% include 'assets/style.css' %}
+        {% include 'assets/style-templates.css' %}
     </style>
 </head>
 <body class="white-bg">
@@ -25,7 +25,7 @@
 <table width="100%">
     <tbody>
     <tr>
-        <td style="padding:30px; !important">
+        <td style="padding:30px; !important ">
             <table width="100%" height="200px" border="0" aling="center" cellpadding="0" cellspacing="0">
                 <tbody>
                 <tr>
@@ -33,43 +33,41 @@
                         <div style="margin-top:35px;">
                             <img
                                 src="{{ params.system.logo|image_b64 }}"
-                                width="300"
+                                width="250"
                                 style="text-align:center;"
                                 border="0"
                             >
                         </div>
                     </td>
                     <td width="5%" height="40" align="center"></td>
-                    <td width="45%" rowspan="2" valign="bottom" style="padding-left:0">
-                        <div class="tabla_borde">
-                            <table width="100%" border="0" height="200" cellpadding="6" cellspacing="0">
-                                <tbody>
-                                <tr>
-                                    <td align="center">
-                                        <span style="font-family:Tahoma, Geneva, sans-serif; font-size:29px" text-align="center">{{ name }}</span>
-                                        <br>
-                                        <span style="font-family:Tahoma, Geneva, sans-serif; font-size:19px" text-align="center">E L E C T R Ó N I C A</span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td align="center">
-                                        <span style="font-size:15px" text-align="center">R.U.C.: {{ cp.ruc }}</span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td align="center">
-                                        <span style="font-size:24px">{{ doc.serie }}-{{ doc.correlativo }}</span>
-                                    </td>
-                                </tr>
-                                </tbody>
-                            </table>
+                    <td width="45%" rowspan="2" valign="middle" align="center" style="padding-left:0;">
+                        <div class="tabla_borde" style="height:207px; display:table; width:100%;">
+                            <div style="display:table-cell; vertical-align:middle; text-align:center; padding:12px;">
+
+                                <div style="font-family:Tahoma, Geneva, sans-serif; font-size:29px; line-height:1.2;">
+                                    {{ name }}
+                                </div>
+
+                                <div style="font-family:Tahoma, Geneva, sans-serif; font-size:19px; margin-top:4px; letter-spacing:2px;">
+                                    E L E C T R Ó N I C A
+                                </div>
+
+                                <div style="font-size:15px; margin-top:18px;">
+                                    R.U.C.: {{ cp.ruc }}
+                                </div>
+
+                                <div style="font-size:24px; font-weight:500; margin-top:18px;">
+                                    {{ doc.serie }}-{{ doc.correlativo }}
+                                </div>
+
+                            </div>
                         </div>
                     </td>
                 </tr>
                 <tr>
                     <td valign="bottom" style="padding-left:0">
                         <div class="tabla_borde">
-                            <table width="96%" height="100%" border="0" cellpadding="9" cellspacing="0">
+                            <table width="100%" height="100%" border="0" cellpadding="9" cellspacing="0">
                                 <tbody>
                                 <tr>
                                     <td align="center">
@@ -93,7 +91,6 @@
                 </tr>
                 </tbody>
             </table>
-
             <div class="tabla_borde">
                 {% set cl = doc.client %}
                 <table width="100%" border="0" cellpadding="5" cellspacing="0">
@@ -103,14 +100,14 @@
                         <td width="40%" align="left"><strong>{{ cl.tipoDoc|catalog('06') }}:</strong> {{ cl.numDoc }}</td>
                     </tr>
                     <tr>
-                        <td width="60%" align="left">
+                        <td width="30%" align="left">
                             <strong>Fecha Emisión: </strong> {{ doc.fechaEmision|date('d/m/Y') }}
                             {% if doc.fechaEmision|date('H:i:s') != '00:00:00' %} {{ doc.fechaEmision|date('H:i:s') }} {% endif %}
                             {% if doc.fecVencimiento is defined and doc.fecVencimiento %}
                                 <br><br><strong>Fecha Vencimiento: </strong> {{ doc.fecVencimiento|date('d/m/Y') }}
                             {% endif %}
                         </td>
-                        <td width="40%" align="left">
+                        <td width="30%" align="left">
                             <strong>Dirección: </strong>
                             {% if cl.address %}{{ cl.address.direccion }}{% endif %}
                         </td>
@@ -125,10 +122,14 @@
 
                     <tr>
                         <td width="60%" align="left"><strong>Tipo Moneda: </strong> {{ doc.tipoMoneda|catalog('021') }}</td>
-                        <td width="40%" align="left">
-                            {% if doc.compra is defined and doc.compra %}
+                        {% if doc.compra is defined and doc.compra %}
+                            <td width="40%" align="left">
                                 <strong>O/C: </strong> {{ doc.compra }}
-                            {% endif %}
+                            </td>
+                        {% endif %}
+                        <td width="40%" align="left">
+                            <strong>Teléfono: </strong>
+                            {{ cl.telephone ?? '-' }}
                         </td>
                     </tr>
 
@@ -208,11 +209,7 @@
                             <tr>
                                 <td colspan="4">
                                     <br><br>
-                                    <span style="font-family:Tahoma, Geneva, sans-serif; font-size:12px" text-align="center">
-                                        <strong>{{ legend(doc.legends, '1000') }}</strong>
-                                    </span>
-                                    <br><br>
-                                    <strong>Información Adicional</strong>
+                                    <strong >Información Adicional</strong>
                                 </td>
                             </tr>
                             </tbody>
@@ -221,23 +218,17 @@
                         <table width="100%" border="0" cellpadding="5" cellspacing="0">
                             <tbody>
                             <tr class="border_top">
-                                <td width="30%" style="font-size: 10px;">LEYENDA:</td>
-                                <td width="70%" style="font-size: 10px;">
-                                    <p>
-                                        {% for leg in doc.legends %}
-                                            {% if leg.code != '1000' %}
-                                                {{ leg.value }}<br>
-                                            {% endif %}
-                                        {% endfor %}
-                                    </p>
+                                <td width="30%" style="font-size: 12px;">LEYENDA:</td>
+                                <td width="70%" style="font-size: 12px;">
+                                    <strong>{{ legend(doc.legends, '1000') }}</strong>
                                 </td>
                             </tr>
 
                             {% if params.user.extras is defined %}
                                 {% for item in params.user.extras %}
                                     <tr class="border_top">
-                                        <td width="30%" style="font-size: 10px;">{{ item.name|upper }}:</td>
-                                        <td width="70%" style="font-size: 10px;">{{ item.value }}</td>
+                                        <td width="30%" style="font-size: 12px;">{{ item.name|upper }}:</td>
+                                        <td width="70%" style="font-size: 12px;"><strong>{{ item.value }}</strong></td>
                                     </tr>
                                 {% endfor %}
                             {% endif %}
@@ -249,6 +240,18 @@
                         <br>
                         <table width="100%" border="0" cellpadding="0" cellspacing="0" class="table table-valores-totales">
                             <tbody>
+                            {% if totalDscto > 0 %}
+                                <tr class="border_bottom">
+                                    <td align="right"><strong>Valor Venta:</strong></td>
+                                    <td width="120" align="right"><span>{{ moneda }} {{ (doc.mtoOperGravadas + totalDscto)|n_format }}</span></td>
+                                </tr>
+
+                                <tr class="border_bottom">
+                                    <td align="right"><strong>Descuentos:</strong></td>
+                                    <td width="120" style="color:#dc2626;" align="right"><span>- {{ moneda }} {{ totalDscto|n_format }}</span></td>
+                                </tr>
+                            {% endif %}
+
                             {% if doc.mtoOperGravadas %}
                                 <tr class="border_bottom">
                                     <td align="right"><strong>Op. Gravadas:</strong></td>
@@ -274,13 +277,6 @@
                                 <tr class="border_bottom">
                                     <td align="right"><strong>Op. Gratuitas:</strong></td>
                                     <td width="120" align="right"><span>{{ moneda }} {{ doc.mtoOperGratuitas|n_format }}</span></td>
-                                </tr>
-                            {% endif %}
-
-                            {% if totalDscto > 0 %}
-                                <tr class="border_bottom">
-                                    <td align="right"><strong>Descuentos:</strong></td>
-                                    <td width="120" align="right"><span>- {{ moneda }} {{ totalDscto|n_format }}</span></td>
                                 </tr>
                             {% endif %}
 

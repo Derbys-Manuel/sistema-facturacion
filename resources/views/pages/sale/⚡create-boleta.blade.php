@@ -496,6 +496,7 @@ new class extends Component
         class="max-w-lg bg-gray-100"
         scroll="body"
         :dismissible="false"
+        :closable="false"
     >
         <livewire:client.create />
     </flux:modal>
@@ -505,6 +506,7 @@ new class extends Component
         class="max-w-lg bg-gray-100"
         scroll="body"
         :dismissible="false"
+        :closable="false"
     >
         <livewire:sale.modal-item />
     </flux:modal>

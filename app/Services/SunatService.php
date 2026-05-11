@@ -114,6 +114,11 @@ class SunatService
     }
     public function getClient(?ClientModels $client = null): Client
     {
+        $address = (new Address())
+        ->setDireccion(
+            $client?->address
+            ?? null
+        );
         if ($client === null) {
             return (new Client())
                 ->setTipoDoc(DocIdentityType::DNI->value)
@@ -123,7 +128,9 @@ class SunatService
         return (new Client())
             ->setTipoDoc($client->doc_identity_type->value ?? DocIdentityType::DNI->value)
             ->setNumDoc($client->document_number ?? '00000000')
-            ->setRznSocial($client->name ?? $client->trade_name ?? 'CLIENTE-VARIOS');
+            ->setRznSocial($client->name ?? $client->trade_name ?? 'CLIENTE-VARIOS')
+            ->setAddress($address)
+            ->setTelephone($client->telephone ?? null);
     }
 
 
