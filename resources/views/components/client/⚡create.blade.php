@@ -200,6 +200,13 @@ new class extends Component
                     :error="$errors->first('client.tradeName')"
                 />
             </div>
+            <x-form.input
+                label="Dirección"
+                wire:model.defer="client.address"
+                placeholder="Ingresa dirección"
+                icon-left="map-pin"
+                :error="$errors->first('client.address')"
+            />
             <div class="grid grid-cols-2 gap-3">
                 <x-form.input
                     label="Departamento"

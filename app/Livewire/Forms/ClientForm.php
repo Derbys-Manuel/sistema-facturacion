@@ -106,7 +106,7 @@ class ClientForm extends Form
             $this->tradeName = $razonSocialCamel ?? $razonSocialSnake ?? $this->tradeName;
         }
 
-        $this->address = $data['direccion'] ?? $data['dirección'] ?? null;
+        $this->address = $data['direccion'] ?? null;
         $this->department = $data['departamento'] ?? null;
         $this->province = $data['provincia'] ?? null;
         $this->district = $data['distrito'] ?? null;

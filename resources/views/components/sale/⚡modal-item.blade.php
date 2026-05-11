@@ -271,7 +271,7 @@ new class extends Component
                     <flux:icon.loading
                         wire:loading
                         wire:target="closeModal"
-                        class="size-4 animate-spin"
+                        class="size-6 animate-spin"
                     />
                 </button>
             </div>

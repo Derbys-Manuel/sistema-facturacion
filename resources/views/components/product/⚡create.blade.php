@@ -65,7 +65,7 @@ new class extends Component
             <div class="flex items-start justify-between gap-4">
                 <div class="flex items-start gap-3">
                     <div class="mt-0.5 flex size-9 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
-                        <flux:icon.cube class="size-4" />
+                        <flux:icon.cube class="size-6" />
                     </div>
                     <div>
                         <h2 class="text-sm font-bold uppercase tracking-wide text-emerald-900">
