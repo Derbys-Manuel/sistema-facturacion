@@ -57,34 +57,9 @@ new class extends Component
         $saleService->applyTotals($this->sale, $this->items);
     }
 
-    #[On('sale-item-created')]
-    public function saleItemCreated(array $item, SaleService $saleService): void
-    {
-        $this->items[] = $item;
-
-        $saleService->applyTotals($this->sale, $this->items);
-
-        $this->dispatch('reset-sale-item-modal');
-    }
-
-    #[On('sale-item-updated')]
-    public function saleItemUpdated(int $index, array $item, SaleService $saleService): void
-    {
-        if (! isset($this->items[$index])) {
-            return;
-        }
-
-        $this->items[$index] = $item;
-
-        $saleService->applyTotals($this->sale, $this->items);
-
-        $this->dispatch('reset-sale-item-modal');
-    }
-
     public function toggleGlobalDiscount(SaleService $saleService): void
     {
         $enabled = (bool) data_get($this->sale->discounts, '0.enabled', false);
-
         if ($enabled) {
             $this->sale->discounts = [];
         } else {
@@ -92,21 +67,18 @@ new class extends Component
                 $saleService->newDiscount(DiscountType::GLOBAL->value),
             ];
         }
-
         $saleService->applyTotals($this->sale, $this->items);
     }
 
     public function recalculateGlobalDiscountFromAmount(SaleService $saleService): void
     {
         data_set($this->sale->discounts, '0.mode', 'amount');
-
         $saleService->applyTotals($this->sale, $this->items);
     }
 
     public function recalculateGlobalDiscountFromPercent(SaleService $saleService): void
     {
         data_set($this->sale->discounts, '0.mode', 'percent');
-
         $saleService->applyTotals($this->sale, $this->items);
     }
 
@@ -120,9 +92,7 @@ new class extends Component
         if (blank($id)) {
             return;
         }
-
         $this->sale->clientId = $id;
-
         if (filled($label)) {
             if (str_contains($label, ' - ')) {
                 [$name, $documentNumber] = explode(' - ', $label, 2);
@@ -131,7 +101,6 @@ new class extends Component
                 $label = Str::limit($label, 12, '...');
             }
         }
-
         $this->selectedClientLabel = $label;
     }
 
@@ -182,6 +151,13 @@ new class extends Component
         $this->redirectRoute('vouchers', navigate: true);
     }
 
+    #[On('sale-item-created')]
+    public function saleItemCreated(array $item, SaleService $saleService): void
+    {
+        $this->items[] = $item;
+        $saleService->applyTotals($this->sale, $this->items);
+        $this->dispatch('reset-sale-item-modal');
+    }
     #[On('created-client')]
     public function clientCreated(array $client): void
     {
@@ -200,9 +176,19 @@ new class extends Component
             ],
         ];
     }
-     #[On('pdf-modal-closed')]
+    #[On('pdf-modal-closed')]
     public function resetFromModal(){
         $this->resetForm();
+    }
+    #[On('sale-item-updated')]
+    public function saleItemUpdated(int $index, array $item, SaleService $saleService): void
+    {
+        if (! isset($this->items[$index])) {
+            return;
+        }
+        $this->items[$index] = $item;
+        $saleService->applyTotals($this->sale, $this->items);
+        $this->dispatch('reset-sale-item-modal');
     }
 
     public function save(SunatService $sunatService, SerieService $serieService): void
@@ -214,10 +200,8 @@ new class extends Component
                 variant: 'warning',
                 duration: 2000
             );
-
             return;
         }
-
         if (! $this->sale->clientId) {
             Flux::toast(
                 heading: 'Alerta',
@@ -228,7 +212,6 @@ new class extends Component
 
             return;
         }
-
         try {
             $this->sale->items = $this->items;
 
@@ -265,7 +248,6 @@ new class extends Component
     }
 };
 ?>
-
 <div>
     <div class="grid gap-4 grid-cols-[4fr_2.5fr] h-[88vh] overflow-auto scrollbar-thin-stable">
         <section class="flex flex-col overflow-auto rounded-sm bg-white scrollbar-thin-stable">
@@ -513,6 +495,7 @@ new class extends Component
         class="max-w-lg bg-gray-100"
         scroll="body"
         :dismissible="false"
+        :closable="false"
     >
         <livewire:client.create />
     </flux:modal>
@@ -522,6 +505,7 @@ new class extends Component
         class="max-w-lg bg-gray-100"
         scroll="body"
         :dismissible="false"
+        :closable="false"
     >
         <livewire:sale.modal-item />
     </flux:modal>

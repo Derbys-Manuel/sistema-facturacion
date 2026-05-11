@@ -195,6 +195,7 @@ new class extends Component
         $this->editingIndex = null;
 
         $this->saleItem->reset();
+        $this->saleItem->resetValidation();
 
         $this->saleItem->id = null;
         $this->saleItem->description = null;
@@ -214,6 +215,11 @@ new class extends Component
 
         $this->products = [];
     }
+    public function closeModal(SaleService $saleService): void
+    {
+        $this->resetItem($saleService);
+        $this->dispatch('modal-close', name: 'sale-item');
+    }
     #[On('reset-sale-item-modal')]
     public function resetModalAfterClose(): void
     {
@@ -227,228 +233,252 @@ new class extends Component
     }
 };
 ?>
-
-<div class="space-y-0">
-    <div class="rounded-sm bg-white p-4 space-y-4">
-         <div class="border-b border-zinc-100 px-5 py-4">
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-800">
-                Datos del producto
-            </h2>
+<div x-data class="mx-auto w-full max-w-xl overflow-hidden rounded-sm bg-white">
+    <div class="relative bg-white">
+        <div
+            wire:loading.flex
+            wire:target="closeModal"
+            class="absolute inset-0 z-50 hidden items-center justify-center bg-white/75 backdrop-blur-[1px]"
+        >
+            <div class="flex items-center gap-2 rounded-md bg-white px-4 py-3 shadow">
+                <flux:icon.loading class="size-4 animate-spin text-emerald-600" />
+                <span class="text-sm font-medium text-zinc-600">Limpiando...</span>
+            </div>
         </div>
-        <div class="grid grid-cols-[1fr_auto] gap-2">
-            <div x-data="{ open: false }" class="relative">
-                <div
-                    class="transition-opacity duration-150"
-                    wire:loading.class="opacity-60"
-                    wire:target="searchProduct,selectProduct"
-                >
-                    <x-form.input
-                        label="Descripción"
-                        type="text"
-                        size="sm"
-                        wire:model.live.debounce.300ms="saleItem.description"
-                        x-on:input.debounce.300ms="
-                            open = true;
-                            $wire.searchProduct($event.target.value);
-                        "
-                        x-on:focus="open = true"
-                        placeholder="Buscar o escribir descripción..."
-                        :error="$errors->first('saleItem.description')"
-                    />
-                </div>
-    
-                @if(count($products))
-                    <div
-                        x-show="open"
-                        x-cloak
-                        x-transition.opacity.scale.origin.top.duration.150ms
-                        x-on:click.outside="open = false"
-                        class="absolute z-[100000] mt-1 w-full max-h-64 overflow-y-auto rounded-sm border border-zinc-200 bg-white shadow-xl"
-                    >
-                        @foreach($products as $option)
-                            <button
-                                type="button"
-                                class="w-full px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-emerald-50 hover:text-emerald-700"
-                                x-on:click="
-                                    open = false;
-                                    $wire.selectProduct(@js($option['value']), @js($option['label']));
-                                "
-                            >
-                                {{ $option['label'] }}
-                            </button>
-                        @endforeach
+        <div class="border-b border-emerald-100 bg-emerald-50/70 px-5 py-4">
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex items-start gap-3">
+                    <div class="mt-0.5 flex size-9 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
+                        <flux:icon.shopping-bag class="size-4" />
                     </div>
-                @endif
-            </div>
-            <flux:modal.trigger name="product-create">
-                <x-form.button
-                    variant="success"
-                    size="icon"
+                    <div>
+                        <h2 class="text-sm font-bold uppercase tracking-wide text-emerald-900">
+                            Producto
+                        </h2>
+                        <p class="mt-1 text-xs text-emerald-700/80">
+                            Agrega o edita los datos del producto.
+                        </p>
+                    </div>
+                </div>
+                <button
                     type="button"
-                    leftIcon="plus"
-                    class="mt-6"
-                />
-            </flux:modal.trigger>
+                    wire:click="closeModal"
+                    wire:loading.attr="disabled"
+                    wire:target="closeModal"
+                    class="rounded-md p-2 text-emerald-700 transition hover:bg-white hover:text-emerald-900"
+                >
+                    <span wire:loading.remove wire:target="closeModal">✕</span>
+                    <flux:icon.loading
+                        wire:loading
+                        wire:target="closeModal"
+                        class="size-4 animate-spin"
+                    />
+                </button>
+            </div>
         </div>
-
-        {{-- INPUTS PRINCIPALES --}}
-        <div class="grid grid-cols-3 gap-3">
-
-            <div
-                class="transition-opacity duration-150"
-                wire:loading.class="opacity-60"
-                wire:target="calculateFromPrice"
-            >
-                <x-form.input
-                    label="Cantidad"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    size="sm"
-                    wire:model.live.blur="saleItem.quantity"
-                    placeholder="0.00"
-                    :error="$errors->first('saleItem.quantity')"
-                />
+        <div class="space-y-4 px-5 py-5">
+            <div class="grid grid-cols-[1fr_auto] gap-2">
+                <div x-data="{ open: false }" class="relative">
+                    <div
+                        class="transition-opacity duration-150"
+                        wire:loading.class="opacity-60"
+                        wire:target="searchProduct,selectProduct"
+                    >
+                        <x-form.input
+                            label="Descripción"
+                            type="text"
+                            size="sm"
+                            wire:model.live.debounce.300ms="saleItem.description"
+                            x-on:input.debounce.300ms="
+                                open = true;
+                                $wire.searchProduct($event.target.value);
+                            "
+                            x-on:focus="open = true"
+                            placeholder="Buscar o escribir descripción..."
+                            :error="$errors->first('saleItem.description')"
+                        />
+                    </div>
+                    @if(count($products))
+                        <div
+                            x-show="open"
+                            x-cloak
+                            x-transition.opacity.scale.origin.top.duration.150ms
+                            x-on:click.outside="open = false"
+                            class="absolute z-[100000] mt-1 max-h-64 w-full overflow-y-auto rounded-sm border border-zinc-200 bg-white shadow-xl"
+                        >
+                            @foreach($products as $option)
+                                <button
+                                    type="button"
+                                    class="w-full px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-emerald-50 hover:text-emerald-700"
+                                    x-on:click="
+                                        open = false;
+                                        $wire.selectProduct(@js($option['value']), @js($option['label']));
+                                    "
+                                >
+                                    {{ $option['label'] }}
+                                </button>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+                <flux:modal.trigger name="product-create">
+                    <x-form.button
+                        variant="success"
+                        size="icon"
+                        type="button"
+                        leftIcon="plus"
+                        class="mt-6"
+                    />
+                </flux:modal.trigger>
             </div>
-
-            <div
-                class="transition-opacity duration-150"
-                wire:loading.class="opacity-60"
-                wire:target="calculateFromPrice"
-            >
-                <x-form.input
-                    label="Precio unitario"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    size="sm"
-                    wire:model.live.blur="saleItem.unitPrice"
-                    placeholder="0.00"
-                    :error="$errors->first('saleItem.unitPrice')"
-                />
-            </div>
-
-            <div
-                class="transition-opacity duration-150"
-                wire:loading.class="opacity-60"
-                wire:target="calculateFromTotal"
-            >
-                <x-form.input
-                    label="Total"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    size="sm"
-                    wire:model.live.blur="saleItem.total"
-                    placeholder="0.00"
-                    :error="$errors->first('saleItem.total')"
-                />
-            </div>
-
-        </div>
-
-        {{-- DESCUENTOS --}}
-        <div class="rounded-sm bg-emerald-50/50 p-3 space-y-3">
-
-            <div>
-                <p class="text-xs font-semibold text-zinc-800">
-                  Descuento sobre la base imponible S/ {{ number_format((float) data_get($saleItem->discounts, '0.baseAmount', 0), 2) }}
-                </p>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-
+            <div class="grid grid-cols-3 gap-3">
                 <div
                     class="transition-opacity duration-150"
                     wire:loading.class="opacity-60"
-                    wire:target="calculateFromDiscountAmount"
+                    wire:target="calculateFromPrice"
                 >
                     <x-form.input
-                        prefix="S/"
+                        label="Cantidad"
                         type="number"
                         step="0.01"
                         min="0"
                         size="sm"
-                        wire:model.blur="saleItem.discounts.0.discountAmount"
-                        wire:blur="calculateFromDiscountAmount"
+                        wire:model.live.blur="saleItem.quantity"
                         placeholder="0.00"
-                        :error="$errors->first('saleItem.discounts.0.discountAmount')"
+                        :error="$errors->first('saleItem.quantity')"
                     />
                 </div>
-
                 <div
                     class="transition-opacity duration-150"
                     wire:loading.class="opacity-60"
-                    wire:target="calculateFromDiscountPercent"
+                    wire:target="calculateFromPrice"
                 >
                     <x-form.input
-                        prefix="%"
+                        label="Precio unitario"
                         type="number"
                         step="0.01"
                         min="0"
                         size="sm"
-                        wire:model.blur="saleItem.discounts.0.uiPercent"
-                        wire:blur="calculateFromDiscountPercent"
+                        wire:model.live.blur="saleItem.unitPrice"
                         placeholder="0.00"
-                        :error="$errors->first('saleItem.discounts.0.uiPercent')"
+                        :error="$errors->first('saleItem.unitPrice')"
                     />
                 </div>
-
+                <div
+                    class="transition-opacity duration-150"
+                    wire:loading.class="opacity-60"
+                    wire:target="calculateFromTotal"
+                >
+                    <x-form.input
+                        label="Total"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        size="sm"
+                        wire:model.live.blur="saleItem.total"
+                        placeholder="0.00"
+                        :error="$errors->first('saleItem.total')"
+                    />
+                </div>
             </div>
-        </div>
-
-        {{-- TOTALES --}}
-        <div class="grid grid-cols-2 gap-3 rounded-sm bg-zinc-50 p-3">
-            <div>
-                <p class="text-xs text-zinc-500">IGV</p>
-                <p class="text-sm font-semibold tabular-nums">
-                    S/ {{ number_format((float) ($saleItem->igv ?? 0), 2) }}
+            <div class="space-y-3 rounded-sm bg-red-50/80 p-3">
+                <p class="text-xs font-semibold text-red-900">
+                    Descuento sobre la base imponible S/
+                    {{ number_format((float) data_get($saleItem->discounts, '0.baseAmount', 0), 2) }}
                 </p>
+                <div class="grid grid-cols-2 gap-3">
+                    <div
+                        class="transition-opacity duration-150"
+                        wire:loading.class="opacity-60"
+                        wire:target="calculateFromDiscountAmount"
+                    >
+                        <x-form.input
+                            prefix="S/"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            size="sm"
+                            wire:model.blur="saleItem.discounts.0.discountAmount"
+                            wire:blur="calculateFromDiscountAmount"
+                            placeholder="0.00"
+                            :error="$errors->first('saleItem.discounts.0.discountAmount')"
+                        />
+                    </div>
+                    <div
+                        class="transition-opacity duration-150"
+                        wire:loading.class="opacity-60"
+                        wire:target="calculateFromDiscountPercent"
+                    >
+                        <x-form.input
+                            prefix="%"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            size="sm"
+                            wire:model.blur="saleItem.discounts.0.uiPercent"
+                            wire:blur="calculateFromDiscountPercent"
+                            placeholder="0.00"
+                            :error="$errors->first('saleItem.discounts.0.uiPercent')"
+                        />
+                    </div>
+                </div>
             </div>
-
-            <div>
-                <p class="text-xs text-zinc-500">Total</p>
-                <p class="text-sm font-semibold tabular-nums">
-                    S/ {{ number_format((float) ($saleItem->total ?? 0), 2) }}
-                </p>
+            <div class="grid grid-cols-2 gap-3 rounded-sm bg-zinc-50 p-3">
+                <div>
+                    <p class="text-xs text-zinc-500">IGV</p>
+                    <p class="text-sm font-semibold tabular-nums text-zinc-800">
+                        S/ {{ number_format((float) ($saleItem->igv ?? 0), 2) }}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-xs text-zinc-500">Total</p>
+                    <p class="text-sm font-semibold tabular-nums text-zinc-800">
+                        S/ {{ number_format((float) ($saleItem->total ?? 0), 2) }}
+                    </p>
+                </div>
             </div>
-        </div>
-        <div class="flex justify-end gap-2">
-            <x-form.button
-                type="button"
-                variant="ghost"
-                wire:click="resetItem"
-                wire:loading.attr="disabled"
-            >
-                Limpiar
-            </x-form.button>
-            <x-form.button
-                type="button"
-                variant="success"
-                wire:click="saveItem"
-                wire:loading.attr="disabled"
-                wire:target="saveItem"
-            >
-                <span wire:loading.remove wire:target="saveItem">
-                    Agregar ítem
-                </span>
-                <span
-                    wire:loading.flex
+            <div class="flex justify-end gap-2 border-t border-zinc-100 pt-4">
+                <x-form.button
+                    type="button"
+                    variant="ghost"
+                    wire:click="closeModal"
+                    wire:loading.attr="disabled"
+                    wire:target="closeModal"
+                >
+                    <span wire:loading.remove wire:target="closeModal">
+                        Cancelar
+                    </span>
+                    <span wire:loading.flex wire:target="closeModal" class="hidden items-center gap-2">
+                        <flux:icon.loading class="size-4 animate-spin" />
+                        Limpiando...
+                    </span>
+                </x-form.button>
+                <x-form.button
+                    type="button"
+                    variant="success"
+                    wire:click="saveItem"
+                    wire:loading.attr="disabled"
                     wire:target="saveItem"
-                    class="items-center gap-2"
                 >
-                    <flux:icon.loading class="size-4 animate-spin" />
-                    Guardando...
-                </span>
-            </x-form.button>
+                    <span wire:loading.remove wire:target="saveItem">
+                        Agregar ítem
+                    </span>
+                    <span wire:loading.flex wire:target="saveItem" class="items-center gap-2">
+                        <flux:icon.loading class="size-4 animate-spin" />
+                        Guardando...
+                    </span>
+                </x-form.button>
+            </div>
         </div>
+        <flux:modal
+            name="product-create"
+            class="max-w-lg bg-gray-100"
+            scroll="body"
+            :dismissible="false"
+            :closable="false"
+        >
+            <livewire:product.create />
+        </flux:modal>
+
     </div>
-    <flux:modal
-        name="product-create"
-        class="max-w-lg bg-gray-100"
-        scroll="body"
-        :dismissible="false"
-    >
-        <livewire:product.create />
-    </flux:modal>
 </div>
