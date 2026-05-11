@@ -88,14 +88,15 @@ new class extends Component
         <div
             wire:loading.flex
             wire:target="closeModal"
-            class="absolute inset-0 z-50 hidden items-center justify-center bg-white/75 backdrop-blur-[1px]"
+            class="absolute inset-0 z-50 hidden items-center 
+            justify-center bg-white/75 backdrop-blur-[1px]"
         >
             <div class="flex items-center gap-2 rounded-md bg-white px-4 py-3 shadow">
                 <flux:icon.loading class="size-4 animate-spin text-emerald-600" />
                 <span class="text-sm font-medium text-zinc-600">Limpiando...</span>
             </div>
         </div>
-        <div class="border-b border-emerald-100 bg-emerald-50/70 px-5 py-4">
+        <div class="border-b border-emerald-100 bg-emerald-50/70 px-5 py-2">
             <div class="flex items-start justify-between gap-4">
                 <div class="flex items-start gap-3">
                     <div class="mt-0.5 flex size-9 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
@@ -237,7 +238,7 @@ new class extends Component
                     :error="$errors->first('client.telephone')"
                 />
             </div>
-            <div class="flex justify-end gap-2 border-t border-zinc-100 pt-4">
+            <div class="flex justify-end gap-2 border-t border-zinc-100 pt-0">
                 <x-form.button
                     type="button"
                     variant="ghost"

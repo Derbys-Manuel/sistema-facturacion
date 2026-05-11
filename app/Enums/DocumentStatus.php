@@ -6,7 +6,6 @@ enum DocumentStatus: string
     case DRAFT = 'borrador';
     case APPROVED = 'aprobada';
     case OBSERVED = 'observada';
-    case CONNECTION_FAILED = 'conexion_fallida';
     case REJECTED = 'rechazada';
 
     public static function values(): array
