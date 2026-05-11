@@ -97,12 +97,12 @@ class SaleForm extends Form
     #[Validate('boolean')]
     public $isActive = true;
 
-    #[Validate('required|string')]
+    #[Validate('nullable|string')]
     public ?string $companyId = null;
 
     #[Validate('nullable|string')]
     public ?string $clientId = null;
-    #[Validate('required|array|min:1')]
+    #[Validate('nullable|array|min:1')]
     public array $items = [];
 
     #[Validate('nullable|array')]
@@ -227,24 +227,14 @@ class SaleForm extends Form
             ->all();
 
         $response = $sunatService->send($data, $sale);
-        $sunatSuccess = (bool) data_get($response, 'sunatResponse.success', false);
-        $sunatErrorCode = data_get($response, 'sunatResponse.error.code');
-        $sunatNotes = data_get($response, 'sunatResponse.cdrResponse.notes', []);
-
-        $status = DocumentStatus::REJECTED->value;
-        if ($sunatSuccess) {
-            $status = is_array($sunatNotes) && count($sunatNotes) > 0
-                ? DocumentStatus::OBSERVED->value
-                : DocumentStatus::APPROVED->value;
-        } elseif ($sunatErrorCode === 'CONNECTION_ERROR') {
-            $status = DocumentStatus::CONNECTION_FAILED->value;
-        }
-
+        $sunatSuccess = $response['sunatResponse']['success'] ?? false;
         $sale->update([
             'xml' => $response['xml'] ?? null,
             'hash' => $response['hash'] ?? null,
             'cdr' => $response['sunatResponse'] ?? null,
-            'status' => $status,
+            'status' => $sunatSuccess
+                ? DocumentStatus::APPROVED->value
+                : DocumentStatus::REJECTED->value,
         ]);
         return [
             'saleId' => (string) $sale->id,
