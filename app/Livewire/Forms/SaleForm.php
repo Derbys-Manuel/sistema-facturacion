@@ -96,7 +96,7 @@ class SaleForm extends Form
     public $additionalInfo = null;
 
     #[Validate('boolean')]
-    public $isActive = true;
+    public $sunatState = true;
 
     #[Validate('nullable|string')]
     public ?string $companyId = null;
@@ -192,6 +192,7 @@ class SaleForm extends Form
                 'status' => DocumentStatus::DRAFT->value,
                 'company_id' => $data['companyId'] ?? null,
                 'client_id' => $data['clientId'] ?? null,
+                'sunat_state'=> true
             ])->load('company', 'client');
             $saleDiscounts = $data['discounts'] ?? [];
             if (is_array($saleDiscounts) && collect($saleDiscounts)->contains(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)) {

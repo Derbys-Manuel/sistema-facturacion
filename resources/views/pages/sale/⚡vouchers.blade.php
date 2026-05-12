@@ -198,6 +198,13 @@ new class extends Component
         SaleDocument::where('id', $id)->update([
             'sunat_state'=> false
         ]);
+        $this->mount();
+    }
+    public function restore(string $id){
+        SaleDocument::where('id', $id)->update([
+            'sunat_state'=> true
+        ]);
+        $this->mount();
     }
     public function startNewInvoice(): void
     {
@@ -242,7 +249,7 @@ new class extends Component
             :decimals="2"
         />
     </div>
-    <div class="grid grid-cols-[0.6fr_auto] items-start gap-3 mb-1">
+    <div class="grid grid-cols-[0.6fr_auto] items-start gap-3 mb-2">
         <x-sale.filters
             :doc-sunat-type-options="$this->docSunatTypeOptions"
             :operation-type-options="$this->operationTypeOptions"
@@ -338,9 +345,23 @@ new class extends Component
                             wire:click="previewPdf('{{ $row['id'] }}')">
                                 Abrir pdf
                             </flux:menu.item>
-                            <flux:menu.item icon="trash">
-                                Eliminar
-                            </flux:menu.item>
+                            @if(
+                                (
+                                    $row['sunatState'] === null ||
+                                    $row['sunatState'] === true
+                                )
+                                && data_get($cdr, 'success') === false ||
+                                $row['status'] === DocumentStatus::DRAFT->value
+                            )
+                                <flux:menu.item icon="trash" wire:click="delete('{{ $row['id'] }}')">
+                                    Eliminar
+                                </flux:menu.item>
+                            @endif
+                            @if($row['sunatState'] === false)
+                                <flux:menu.item icon="arrow-path" wire:click="restore('{{ $row['id'] }}')">
+                                    Restaurar
+                                </flux:menu.item>
+                            @endif
                         </flux:menu>
                     </flux:dropdown>
                 </x-ui.table.cell>
