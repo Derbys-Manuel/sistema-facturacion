@@ -226,6 +226,91 @@ class SaleForm extends Form
             ->all();
         return [
             'saleId' => (string) $sale->id,
+            'pdfUrl' => route('sale.pdf', $sale->id),
+        ];
+    }
+
+    public function updateExisting(
+        string $saleId,
+        SaleItemForm $itemForm,
+        DiscountForm $discountForm,
+    ): array {
+        $data = $this->validate();
+
+        $sale = DB::transaction(function () use ($saleId, $data, $itemForm, $discountForm) {
+            $sale = SaleDocument::query()
+                ->with(['items.discounts', 'discounts'])
+                ->findOrFail($saleId);
+
+            if ($sale->status === DocumentStatus::APPROVED) {
+                throw new \RuntimeException('No se puede editar un comprobante aprobado.');
+            }
+
+            $sale->update([
+                'document_type' => $data['documentType'],
+                'ubl_version' => $data['ublVersion'],
+                'doc_sunat_type' => $data['docSunatType'],
+                'operation_type' => $data['operationType'],
+                'payment_form' => $data['paymentForm'],
+                'currency' => $data['currency'],
+                'credit_days' => $data['creditDays'],
+                'num_quota' => $data['numQuota'],
+                'total_taxed' => $data['totalTaxed'],
+                'total_exempted' => $data['totalExempted'],
+                'total_unaffected' => $data['totalUnaffected'],
+                'total_export' => $data['totalExport'],
+                'total_free' => $data['totalFree'],
+                'total_igv' => $data['totalIgv'],
+                'total_igv_free' => $data['totalIgvFree'],
+                'icbper' => $data['icbper'],
+                'total_taxes' => $data['totalTaxes'],
+                'sale_value' => $data['saleValue'],
+                'sub_total' => $data['subTotal'],
+                'total_sale' => $data['totalSale'],
+                'rounding' => $data['rounding'],
+                'total' => $data['total'],
+                'date_issue' => $data['dateIssue'],
+                'date_expiration' => $data['dateExpiration'],
+                'additional_info' => $data['additionalInfo'],
+                'company_id' => $data['companyId'] ?? null,
+                'client_id' => $data['clientId'] ?? null,
+
+                // al editar, se deja listo para reenvío
+                'xml' => null,
+                'hash' => null,
+                'cdr' => null,
+                'status' => DocumentStatus::DRAFT->value,
+                'sunat_state' => true,
+            ]);
+
+            $sale->discounts()->delete();
+
+            foreach ($sale->items as $item) {
+                $item->discounts()->delete();
+            }
+
+            $sale->items()->delete();
+
+            $saleDiscounts = $data['discounts'] ?? [];
+            if (
+                is_array($saleDiscounts)
+                && collect($saleDiscounts)->contains(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)
+            ) {
+                $discountForm->store(
+                    discounts: $saleDiscounts,
+                    saleDocumentId: (string) $sale->id,
+                    saleDocumentItemId: null
+                );
+            }
+
+            $itemForm->store($data['items'], (string) $sale->id, $discountForm);
+
+            return $sale->load('company', 'client');
+        });
+
+        return [
+            'saleId' => (string) $sale->id,
+            'pdfUrl' => route('sale.pdf', $sale->id),
         ];
     }
     public function send(string $saleId, SunatService $sunatService, SaleService $saleService): array

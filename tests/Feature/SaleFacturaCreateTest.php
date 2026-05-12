@@ -94,6 +94,17 @@ it('creates a sale document from the factura page', function () {
         'doc_sunat_type' => DocSunatType::FACTURA->value,
         'serie' => 'F001',
         'correlative' => '00000001',
+        'status' => DocumentStatus::DRAFT->value,
+    ]);
+
+    $saleDocumentId = (string) SaleDocument::query()->value('id');
+
+    Livewire::test('send-modal', ['saleId' => $saleDocumentId])
+        ->call('sendSunat')
+        ->assertHasNoErrors();
+
+    $this->assertDatabaseHas('sale_documents', [
+        'id' => $saleDocumentId,
         'status' => DocumentStatus::APPROVED->value,
     ]);
 });

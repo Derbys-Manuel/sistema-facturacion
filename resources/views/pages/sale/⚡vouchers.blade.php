@@ -194,6 +194,29 @@ new class extends Component
         $this->sendSaleId = $saleId;
         Flux::modal('confirm')->show();
     }
+
+    public function duplicateSale(string $saleId, ?string $docSunatType = null): void
+    {
+        $route = match ($docSunatType) {
+            DocSunatType::FACTURA->value => 'create-factura',
+            DocSunatType::BOLETA->value => 'create-boleta',
+            default => 'create-boleta',
+        };
+
+        $this->redirect(route($route, ['duplicate' => $saleId]), navigate: true);
+    }
+
+    public function editSale(string $saleId, ?string $docSunatType = null): void
+    {
+        $route = match ($docSunatType) {
+            DocSunatType::FACTURA->value => 'create-factura',
+            DocSunatType::BOLETA->value => 'create-boleta',
+            default => 'create-boleta',
+        };
+
+        $this->redirect(route($route, ['edit' => $saleId]), navigate: true);
+    }
+
     public function delete(string $id){
         SaleDocument::where('id', $id)->update([
             'sunat_state'=> false
@@ -335,6 +358,22 @@ new class extends Component
                     <flux:dropdown>
                         <flux:button icon:trailing="ellipsis-horizontal" size="sm"></flux:button>
                         <flux:menu>
+                            <flux:menu.item
+                                icon="document-duplicate"
+                                wire:click="duplicateSale('{{ $row['id'] }}', '{{ $row['docSunatType'] ?? '' }}')"
+                            >
+                                Duplicar
+                            </flux:menu.item>
+
+                            @if (in_array($row['status'] ?? null, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value], true))
+                                <flux:menu.item
+                                    icon="pencil"
+                                    wire:click="editSale('{{ $row['id'] }}', '{{ $row['docSunatType'] ?? '' }}')"
+                                >
+                                    Editar
+                                </flux:menu.item>
+                            @endif
+
                             @if ($row['status'] === DocumentStatus::DRAFT->value)
                                 <flux:menu.item icon="paper-airplane"
                                 wire:click="confirmSend('{{ $row['id'] }}')">
