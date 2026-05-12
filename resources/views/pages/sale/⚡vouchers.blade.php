@@ -240,6 +240,27 @@ new class extends Component
         $this->closePdfPreview();
         $this->redirectRoute('vouchers', navigate: true);
     }
+    public function canEdit(array $row): bool
+    {
+        $status = (string) ($row['status'] ?? '');
+        if ($status === DocumentStatus::DRAFT->value) {
+            return true;
+        }
+        if ($status !== DocumentStatus::REJECTED->value) {
+            return false;
+        }
+        $cdr = $row['cdr'] ?? null;
+        if (! is_array($cdr)) {
+            return false;
+        }
+        $errorCodeRaw = data_get($cdr, 'error.code');
+        if ($errorCodeRaw === null || $errorCodeRaw === '') {
+            return false;
+        }
+        $errorCode = (int) $errorCodeRaw;
+        return $errorCode >= 100 && $errorCode <= 1999;
+    }
+
     #[On('closed-modal-send')]
     public function closeModalSend(){
         $this->mount();    
@@ -364,8 +385,7 @@ new class extends Component
                             >
                                 Duplicar
                             </flux:menu.item>
-
-                            @if (in_array($row['status'] ?? null, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value], true))
+                            @if ($this->canEdit($row))
                                 <flux:menu.item
                                     icon="pencil"
                                     wire:click="editSale('{{ $row['id'] }}', '{{ $row['docSunatType'] ?? '' }}')"
@@ -373,7 +393,6 @@ new class extends Component
                                     Editar
                                 </flux:menu.item>
                             @endif
-
                             @if ($row['status'] === DocumentStatus::DRAFT->value)
                                 <flux:menu.item icon="paper-airplane"
                                 wire:click="confirmSend('{{ $row['id'] }}')">
