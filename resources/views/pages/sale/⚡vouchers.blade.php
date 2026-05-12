@@ -6,6 +6,7 @@ use App\Livewire\Forms\SaleForm;
 use Illuminate\Support\Carbon;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Livewire\Attributes\On;
 use Flux\Flux;
 
 new class extends Component
@@ -22,6 +23,7 @@ new class extends Component
 
     public bool $pdfPreviewOpen = false;
     public ?string $pdfPreviewUrl = null;
+    public ?string $sendSaleId = null;
 
     public function setCompany(?string $companyId = null): void
     {
@@ -172,18 +174,36 @@ new class extends Component
         $this->openPdfPreview(route('sale.pdf', $saleId));
     }
 
+    public function confirmSend(?string $saleId = null): void
+    {
+        if (blank($saleId)) {
+            Flux::toast(
+                heading: 'Alerta',
+                text: 'No se encontró el comprobante para enviar',
+                variant: 'warning',
+                duration: 2500
+            );
+
+            return;
+        }
+        $this->sendSaleId = $saleId;
+        Flux::modal('confirm')->show();
+    }
+
     public function startNewInvoice(): void
     {
         $this->closePdfPreview();
-
         $this->redirectRoute('create-factura', navigate: true);
     }
 
     public function goToVouchers(): void
     {
         $this->closePdfPreview();
-
         $this->redirectRoute('vouchers', navigate: true);
+    }
+    #[On('closed-modal-send')]
+    public function closeModalSend(){
+        $this->mount();    
     }
 };
 ?>
@@ -276,15 +296,23 @@ new class extends Component
                         </flux:tooltip.content>
                     </flux:tooltip>
                 </x-ui.table.cell>
-
                 <x-ui.table.cell>
-                    <x-form.button
-                        variant="success"
-                        size="xs"
-                        type="button"
-                        leftIcon="document"
-                        wire:click="previewPdf('{{ $row['id'] }}')"
-                    />
+                    <div class="flex items-center gap-2">
+                        <x-form.button
+                            variant="success"
+                            size="xs"
+                            type="button"
+                            leftIcon="document"
+                            wire:click="previewPdf('{{ $row['id'] }}')"
+                        />
+                        <x-form.button
+                            variant="ghost"
+                            size="xs"
+                            type="button"
+                            leftIcon="paper-airplane"
+                            wire:click="confirmSend('{{ $row['id'] }}')"
+                        />
+                    </div>
                 </x-ui.table.cell>
             </tr>
         @empty
@@ -326,6 +354,8 @@ new class extends Component
         :url="$pdfPreviewUrl"
         :show-footer-actions="false"
     />
+
+    <livewire:send-modal :sale-id="$sendSaleId" :key="'send-modal-'.($sendSaleId ?? 'none')" />
 </div>
 @script
 <script>

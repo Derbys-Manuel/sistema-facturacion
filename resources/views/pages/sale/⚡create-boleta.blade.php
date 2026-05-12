@@ -8,7 +8,6 @@ use App\Livewire\Forms\ClientForm;
 use App\Enums\Sunat\DocSunatType;
 use App\Enums\Sunat\DiscountType;
 use App\Services\SaleService;
-use App\Services\SunatService;
 use App\Services\SerieService;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -207,35 +206,6 @@ new class extends Component
         $this->items[$index] = $item;
         $saleService->applyTotals($this->sale, $this->items);
         $this->dispatch('reset-sale-item-modal');
-    }
-    public function sendSunat(SunatService $sunatService, SaleService $saleService): void
-    {
-        try {
-            $result = $this->sale->send(
-                $this->savedSaleId,
-                $sunatService,
-                $saleService
-            );
-            $response = $result['sunat'] ?? [];
-            $sunatSuccess = $response['sunatResponse']['success'] ?? false;
-            Flux::toast(
-                heading: $sunatSuccess ? 'SUNAT' : 'Comprobante rechazado',
-                text: $sunatSuccess
-                    ? 'Comprobante aceptado por SUNAT'
-                    : ($response['sunatResponse']['error']['message'] ?? 'SUNAT rechazó el comprobante'),
-                variant: $sunatSuccess ? 'success' : 'warning',
-                duration: 4000
-            );
-            Flux::modal('confirm')->close();
-        } catch (\Throwable $th) {
-            Flux::toast(
-                heading: 'Error',
-                text: $th->getMessage() ?: 'No se pudo enviar el comprobante',
-                variant: 'warning',
-                duration: 4000
-            );
-            report($th);
-        }
     }
     public function save(SerieService $serieService): void    
     {
@@ -545,6 +515,8 @@ new class extends Component
         new-action="startNewBoleta"
         list-action="goToVouchers"
     />
+
+    <livewire:send-modal :sale-id="$savedSaleId" :key="'send-modal-'.($savedSaleId ?? 'none')" />
 </div>
 
 @script

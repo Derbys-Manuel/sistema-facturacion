@@ -8,7 +8,6 @@ use App\Livewire\Forms\SaleItemForm;
 use App\Livewire\Forms\DiscountForm;
 use App\Livewire\Forms\ClientForm;
 use App\Services\SaleService;
-use App\Services\SunatService;
 use App\Services\SerieService;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -192,30 +191,6 @@ new class extends Component
         $this->dispatch('reset-sale-item-modal');
     }
     
-    public function sendSunat( SunatService $sunatService, SaleService $saleService){
-        try {
-            $result = $this->sale->send($this->savedSaleId,$sunatService, $saleService);
-            $response = $result['sunat'] ?? [];
-            $sunatSuccess = $response['sunatResponse']['success'] ?? false;
-            Flux::toast(
-                heading: $sunatSuccess ? 'SUNAT' : 'Comprobante rechazado',
-                text: $sunatSuccess
-                    ? 'Comprobante aceptado por SUNAT'
-                    : ($response['sunatResponse']['error']['message'] ?? 'SUNAT rechazó el comprobante'),
-                variant: $sunatSuccess ? 'success' : 'warning',
-                duration: 4000
-            );
-            Flux::modal('confirm')->close();
-        } catch (\Throwable $th) {
-            Flux::toast(
-                heading: 'Error',
-                text: $th->getMessage() ?: 'No se pudo enviar el comprobante',
-                variant: 'warning',
-                duration: 4000
-            );
-            report($th);
-        }
-    }
     public function save(
         SerieService $serieService
     ): void
@@ -536,60 +511,8 @@ new class extends Component
         new-action="startNewInvoice"
         list-action="goToVouchers"
     />
-    <flux:modal name="confirm" class="max-w-md" :dismissible="false">
-        <div class="p-6">
-            <div class="flex items-start gap-4">
-                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                    <flux:icon.paper-airplane class="size-6" />
-                </div>
-                <div class="flex-1">
-                    <h2 class="text-lg font-semibold text-zinc-800">
-                        Enviar comprobante
-                    </h2>
 
-                    <p class="mt-1 text-sm leading-relaxed text-zinc-500">
-                        El documento ya fue guardado correctamente.
-                        ¿Desea enviarlo ahora a SUNAT?
-                    </p>
-                </div>
-            </div>
-            <div class="mt-6 flex justify-end gap-3">
-                <x-form.button
-                    variant="ghost"
-                    type="button"
-                    wire:click="$dispatch('close-modal', { name: 'confirm' })"
-                >
-                    Cancelar
-                </x-form.button>
-                <x-form.button
-                    variant="success"
-                    type="button"
-                    class="min-w-32"
-                    wire:loading.attr="disabled"
-                    wire:target="sendSunat"
-                    wire:click="sendSunat"
-                >
-                    <span
-                        wire:loading.remove
-                        wire:target="sendSunat"
-                        class="inline-flex items-center gap-2"
-                    >
-                        <flux:icon.paper-airplane class="size-4" />
-                        Enviar a SUNAT
-                    </span>
-
-                    <span
-                        wire:loading.flex
-                        wire:target="sendSunat"
-                        class="hidden items-center justify-center gap-2"
-                    >
-                        <flux:icon.loading class="size-4 animate-spin" />
-                        Enviando...
-                    </span>
-                </x-form.button>
-            </div>
-        </div>
-    </flux:modal>
+    <livewire:send-modal :sale-id="$savedSaleId" :key="'send-modal-'.($savedSaleId ?? 'none')" />
 </div>
 
 @script
