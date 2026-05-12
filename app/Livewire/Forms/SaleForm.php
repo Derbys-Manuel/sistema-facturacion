@@ -6,6 +6,7 @@ use App\Enums\DocumentStatus;
 use App\Enums\Sunat\DocSunatType;
 use App\Models\SaleDocument;
 use App\Services\SerieService;
+use App\Services\SaleService;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Form;
 use Livewire\Attributes\Validate;
@@ -141,7 +142,6 @@ class SaleForm extends Form
     }
     public function store(
         SaleItemForm $itemForm, 
-        SunatService $sunatService, 
         SerieService $serieService,
         DiscountForm $discountForm
     ): array
@@ -216,16 +216,26 @@ class SaleForm extends Form
                 if (! is_array($item)) {
                     return $item;
                 }
-
                 $item['discounts'] = collect($item['discounts'] ?? [])
                     ->filter(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)
                     ->values()
                     ->all();
-
                 return $item;
             })
             ->all();
+        return [
+            'saleId' => (string) $sale->id,
+            'pdfUrl' => $response['pdfUrl'] ?? route('sale.pdf', $sale->id),
+        ];
+    }
+    public function send(string $saleId, SunatService $sunatService, SaleService $saleService): array
+    {
+        $sale = SaleDocument::query()
+            ->with(['items', 'client', 'company', 'items.discounts'])
+            ->findOrFail($saleId);
 
+        $data = $sale->toArray();
+        $data['items'] = $saleService->hydrateItemsForSunatFromDatabase($data['items'] ?? []);
         $response = $sunatService->send($data, $sale);
         $sunatSuccess = $response['sunatResponse']['success'] ?? false;
         $sale->update([
@@ -236,11 +246,7 @@ class SaleForm extends Form
                 ? DocumentStatus::APPROVED->value
                 : DocumentStatus::REJECTED->value,
         ]);
-        return [
-            'saleId' => (string) $sale->id,
-            'pdfUrl' => $response['pdfUrl'] ?? route('sale.pdf', $sale->id),
-            'sunat' => $response,
-        ];
+        return ['sunat' => $response];
     }
     public function list(
         ?string $from = null,

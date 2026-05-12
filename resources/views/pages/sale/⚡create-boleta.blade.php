@@ -28,6 +28,7 @@ new class extends Component
     public ?string $selectedClientLabel = null;
     public bool $pdfPreviewOpen = false;
     public ?string $pdfPreviewUrl = null;
+    public ?string $savedSaleId = null;
 
     public function mount(): void
     {
@@ -207,7 +208,36 @@ new class extends Component
         $saleService->applyTotals($this->sale, $this->items);
         $this->dispatch('reset-sale-item-modal');
     }
-    public function save(SunatService $sunatService, SerieService $serieService): void
+    public function sendSunat(SunatService $sunatService, SaleService $saleService): void
+    {
+        try {
+            $result = $this->sale->send(
+                $this->savedSaleId,
+                $sunatService,
+                $saleService
+            );
+            $response = $result['sunat'] ?? [];
+            $sunatSuccess = $response['sunatResponse']['success'] ?? false;
+            Flux::toast(
+                heading: $sunatSuccess ? 'SUNAT' : 'Comprobante rechazado',
+                text: $sunatSuccess
+                    ? 'Comprobante aceptado por SUNAT'
+                    : ($response['sunatResponse']['error']['message'] ?? 'SUNAT rechazó el comprobante'),
+                variant: $sunatSuccess ? 'success' : 'warning',
+                duration: 4000
+            );
+            Flux::modal('confirm')->close();
+        } catch (\Throwable $th) {
+            Flux::toast(
+                heading: 'Error',
+                text: $th->getMessage() ?: 'No se pudo enviar el comprobante',
+                variant: 'warning',
+                duration: 4000
+            );
+            report($th);
+        }
+    }
+    public function save(SerieService $serieService): void    
     {
         if (! $this->sale->companyId) {
             Flux::toast(
@@ -220,27 +250,24 @@ new class extends Component
         }
         try {
             $this->sale->items = $this->items;
-            $result = $this->sale->store(
+           $result = $this->sale->store(
                 $this->saleItem,
-                $sunatService,
                 $serieService,
                 $this->discount
             );
-            $response = $result['sunat'] ?? [];
-            $sunatSuccess = $response['sunatResponse']['success'] ?? false;
             Flux::toast(
-                heading: $sunatSuccess ? 'SUNAT' : 'Comprobante rechazado',
-                text: $sunatSuccess
-                    ? 'Comprobante aceptado por SUNAT'
-                    : ($response['sunatResponse']['error']['message'] ?? 'SUNAT rechazó el comprobante'),
-                variant: $sunatSuccess ? 'success' : 'warning',
-                duration: 4000
+                heading: 'Alerta',
+                text: 'El documento se guardó con éxito',
+                variant: 'success',
+                duration: 3000
             );
+            $this->savedSaleId = $result['saleId'];
             $this->openPdfPreview($result['pdfUrl'] ?? null);
+            Flux::modal('confirm')->show();
         } catch (\Throwable $th) {
             Flux::toast(
                 heading: 'Error',
-                text: $th->getMessage() ?: 'No se pudo guardar ni enviar el comprobante',
+                text: $th->getMessage() ?: 'No se pudo guardar el comprobante',
                 variant: 'warning',
                 duration: 4000
             );

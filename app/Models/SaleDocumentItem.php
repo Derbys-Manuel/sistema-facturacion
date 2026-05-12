@@ -29,23 +29,23 @@ class SaleDocumentItem extends BaseModel
         'igv_amount',
         'icbper_factor',
         'icbper_amount',
-        'taxes_total',
+        'total_taxes',
         'is_active',
         'sale_document_id',
     ];
 
     protected $casts = [
-        'quantity' => 'decimal:2',
-        'unit_value' => 'decimal:2',
-        'unit_price' => 'decimal:2',
-        'item_value' => 'decimal:2',
+        'quantity' => 'decimal:6',
+        'unit_value' => 'decimal:6',
+        'unit_price' => 'decimal:6',
+        'item_value' => 'decimal:6',
         'igv_affectation_type' => AffecType::class,
-        'igv_base_amount' => 'decimal:2',
-        'igv_percent' => 'decimal:2',
-        'igv_amount' => 'decimal:2',
+        'igv_base_amount' => 'decimal:6',
+        'igv_percent' => 'decimal:6',
+        'igv_amount' => 'decimal:6',
         'icbper_factor' => 'decimal:6',
-        'icbper_amount' => 'decimal:2',
-        'taxes_total' => 'decimal:2',
+        'icbper_amount' => 'decimal:6',
+        'total_taxes' => 'decimal:6',
         'is_active' => 'boolean',
     ];
 

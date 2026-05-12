@@ -35,7 +35,7 @@ class SaleItemForm extends Form
     #[Validate('required|numeric|min:0')]
     public $igvAmount = 0;
     #[Validate('required|numeric|min:0')]
-    public $taxesTotal = 0;
+    public $totalTaxes = 0;
     #[Validate('nullable|array')]
     public ?array $discounts = null;
     #[Validate('nullable')]
@@ -61,8 +61,8 @@ class SaleItemForm extends Form
             'igvPercent.numeric' => 'El porcentaje de IGV debe ser numérico.',
             'igvAmount.required' => 'El monto de IGV es obligatorio.',
             'igvAmount.numeric' => 'El monto de IGV debe ser numérico.',
-            'taxesTotal.required' => 'El total de impuestos es obligatorio.',
-            'taxesTotal.numeric' => 'El total de impuestos debe ser numérico.',
+            'totalTaxes.required' => 'El total de impuestos es obligatorio.',
+            'totalTaxes.numeric' => 'El total de impuestos debe ser numérico.',
         ];
     }
     public function validationAttributes(): array
@@ -79,7 +79,7 @@ class SaleItemForm extends Form
             'igvBaseAmount' => 'base imponible IGV',
             'igvPercent' => 'porcentaje IGV',
             'igvAmount' => 'monto IGV',
-            'taxesTotal' => 'total de impuestos',
+            'totalTaxes' => 'total de impuestos',
             'discounts' => 'descuentos',
         ];
     }
@@ -101,7 +101,7 @@ class SaleItemForm extends Form
                 'igv_base_amount' => $item['igvBaseAmount'],
                 'igv_percent' => $item['igvPercent'],
                 'igv_amount' => $item['igvAmount'],
-                'total_taxes' => $item['taxesTotal'],
+                'total_taxes' => $item['totalTaxes'],
             ]);
             $itemDiscounts = $item['discounts'] ?? null;
             if (
