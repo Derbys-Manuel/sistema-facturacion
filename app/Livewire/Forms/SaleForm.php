@@ -6,6 +6,7 @@ use App\Enums\DocumentStatus;
 use App\Enums\Sunat\DocSunatType;
 use App\Models\SaleDocument;
 use App\Services\SerieService;
+use App\Services\SaleService;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Form;
 use Livewire\Attributes\Validate;
@@ -95,7 +96,7 @@ class SaleForm extends Form
     public $additionalInfo = null;
 
     #[Validate('boolean')]
-    public $isActive = true;
+    public $sunatState = true;
 
     #[Validate('nullable|string')]
     public ?string $companyId = null;
@@ -141,7 +142,6 @@ class SaleForm extends Form
     }
     public function store(
         SaleItemForm $itemForm, 
-        SunatService $sunatService, 
         SerieService $serieService,
         DiscountForm $discountForm
     ): array
@@ -192,6 +192,7 @@ class SaleForm extends Form
                 'status' => DocumentStatus::DRAFT->value,
                 'company_id' => $data['companyId'] ?? null,
                 'client_id' => $data['clientId'] ?? null,
+                'sunat_state'=> true
             ])->load('company', 'client');
             $saleDiscounts = $data['discounts'] ?? [];
             if (is_array($saleDiscounts) && collect($saleDiscounts)->contains(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)) {
@@ -216,16 +217,110 @@ class SaleForm extends Form
                 if (! is_array($item)) {
                     return $item;
                 }
-
                 $item['discounts'] = collect($item['discounts'] ?? [])
                     ->filter(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)
                     ->values()
                     ->all();
-
                 return $item;
             })
             ->all();
+        return [
+            'saleId' => (string) $sale->id,
+            'pdfUrl' => route('sale.pdf', $sale->id),
+        ];
+    }
 
+    public function updateExisting(
+        string $saleId,
+        SaleItemForm $itemForm,
+        DiscountForm $discountForm,
+    ): array {
+        $data = $this->validate();
+
+        $sale = DB::transaction(function () use ($saleId, $data, $itemForm, $discountForm) {
+            $sale = SaleDocument::query()
+                ->with(['items.discounts', 'discounts'])
+                ->findOrFail($saleId);
+
+            if ($sale->status === DocumentStatus::APPROVED) {
+                throw new \RuntimeException('No se puede editar un comprobante aprobado.');
+            }
+
+            $sale->update([
+                'document_type' => $data['documentType'],
+                'ubl_version' => $data['ublVersion'],
+                'doc_sunat_type' => $data['docSunatType'],
+                'operation_type' => $data['operationType'],
+                'payment_form' => $data['paymentForm'],
+                'currency' => $data['currency'],
+                'credit_days' => $data['creditDays'],
+                'num_quota' => $data['numQuota'],
+                'total_taxed' => $data['totalTaxed'],
+                'total_exempted' => $data['totalExempted'],
+                'total_unaffected' => $data['totalUnaffected'],
+                'total_export' => $data['totalExport'],
+                'total_free' => $data['totalFree'],
+                'total_igv' => $data['totalIgv'],
+                'total_igv_free' => $data['totalIgvFree'],
+                'icbper' => $data['icbper'],
+                'total_taxes' => $data['totalTaxes'],
+                'sale_value' => $data['saleValue'],
+                'sub_total' => $data['subTotal'],
+                'total_sale' => $data['totalSale'],
+                'rounding' => $data['rounding'],
+                'total' => $data['total'],
+                'date_issue' => $data['dateIssue'],
+                'date_expiration' => $data['dateExpiration'],
+                'additional_info' => $data['additionalInfo'],
+                'company_id' => $data['companyId'] ?? null,
+                'client_id' => $data['clientId'] ?? null,
+
+                // al editar, se deja listo para reenvío
+                'xml' => null,
+                'hash' => null,
+                'cdr' => null,
+                'status' => DocumentStatus::DRAFT->value,
+                'sunat_state' => true,
+            ]);
+
+            $sale->discounts()->delete();
+
+            foreach ($sale->items as $item) {
+                $item->discounts()->delete();
+            }
+
+            $sale->items()->delete();
+
+            $saleDiscounts = $data['discounts'] ?? [];
+            if (
+                is_array($saleDiscounts)
+                && collect($saleDiscounts)->contains(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)
+            ) {
+                $discountForm->store(
+                    discounts: $saleDiscounts,
+                    saleDocumentId: (string) $sale->id,
+                    saleDocumentItemId: null
+                );
+            }
+
+            $itemForm->store($data['items'], (string) $sale->id, $discountForm);
+
+            return $sale->load('company', 'client');
+        });
+
+        return [
+            'saleId' => (string) $sale->id,
+            'pdfUrl' => route('sale.pdf', $sale->id),
+        ];
+    }
+    public function send(string $saleId, SunatService $sunatService, SaleService $saleService): array
+    {
+        $sale = SaleDocument::query()
+            ->with(['items', 'client', 'company', 'items.discounts'])
+            ->findOrFail($saleId);
+
+        $data = $sale->toArray();
+        $data['items'] = $saleService->hydrateItemsForSunatFromDatabase($data['items'] ?? []);
         $response = $sunatService->send($data, $sale);
         $sunatSuccess = $response['sunatResponse']['success'] ?? false;
         $sale->update([
@@ -236,13 +331,10 @@ class SaleForm extends Form
                 ? DocumentStatus::APPROVED->value
                 : DocumentStatus::REJECTED->value,
         ]);
-        return [
-            'saleId' => (string) $sale->id,
-            'pdfUrl' => $response['pdfUrl'] ?? route('sale.pdf', $sale->id),
-            'sunat' => $response,
-        ];
+        return ['sunat' => $response];
     }
     public function list(
+        ?bool $deletedBool = null,
         ?string $from = null,
         ?string $to = null,
         ?string $q = null,
@@ -251,6 +343,7 @@ class SaleForm extends Form
         ?string $companyId = null,
     ): array {
         return $this->documentsQuery(
+            deletedBool: $deletedBool,
             from: $from,
             to: $to,
             q: $q,
@@ -264,6 +357,7 @@ class SaleForm extends Form
             ->toArray();
     }
     public function summary(
+        ?bool $deletedBool = null,
         ?string $from = null,
         ?string $to = null,
         ?string $q = null,
@@ -272,6 +366,7 @@ class SaleForm extends Form
         ?string $companyId = null,
     ): array {
         $query = $this->documentsQuery(
+            deletedBool: $deletedBool,
             from: $from,
             to: $to,
             q: $q,
@@ -301,6 +396,7 @@ class SaleForm extends Form
     }
 
     private function documentsQuery(
+        ?bool $deletedBool = null,
         ?string $from = null,
         ?string $to = null,
         ?string $q = null,
@@ -312,6 +408,14 @@ class SaleForm extends Form
 
         return SaleDocument::query()
             ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
+            ->when(
+                $deletedBool,
+                fn ($query) => $query->where('sunat_state', false),
+                fn ($query) => $query->where(function ($q) {
+                    $q->where('sunat_state', true)
+                    ->orWhereNull('sunat_state');
+                })
+            )
             ->when($from, fn ($query) => $query->whereDate('date_issue', '>=', $from))
             ->when($to, fn ($query) => $query->whereDate('date_issue', '<=', $to))
             ->when($docSunatType, fn ($query) => $query->where('doc_sunat_type', $docSunatType))

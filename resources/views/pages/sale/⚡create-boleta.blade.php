@@ -7,8 +7,9 @@ use App\Livewire\Forms\DiscountForm;
 use App\Livewire\Forms\ClientForm;
 use App\Enums\Sunat\DocSunatType;
 use App\Enums\Sunat\DiscountType;
+use App\Models\SaleDocument;
+use App\Enums\DocumentStatus;
 use App\Services\SaleService;
-use App\Services\SunatService;
 use App\Services\SerieService;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -28,12 +29,84 @@ new class extends Component
     public ?string $selectedClientLabel = null;
     public bool $pdfPreviewOpen = false;
     public ?string $pdfPreviewUrl = null;
+    public ?string $savedSaleId = null;
+    public ?string $editingSaleId = null;
 
-    public function mount(): void
+    public function mount(SaleService $saleService): void
     {
         $this->sale->docSunatType = DocSunatType::BOLETA->value;
         $this->sale->dateIssue = now('America/Lima')->format('Y-m-d H:i:s');
         $this->sale->dateExpiration = now('America/Lima')->format('Y-m-d H:i:s');
+
+        $editSaleId = request()->query('edit');
+        $duplicateSaleId = request()->query('duplicate');
+
+        if (filled($editSaleId)) {
+            $this->loadSaleIntoForm((string) $editSaleId, duplicate: false, saleService: $saleService);
+        } elseif (filled($duplicateSaleId)) {
+            $this->loadSaleIntoForm((string) $duplicateSaleId, duplicate: true, saleService: $saleService);
+        }
+    }
+
+    private function loadSaleIntoForm(string $saleId, bool $duplicate, SaleService $saleService): void
+    {
+        $sale = SaleDocument::query()
+            ->with(['items.discounts', 'discounts', 'client', 'company'])
+            ->findOrFail($saleId);
+
+        $docType = $sale->doc_sunat_type?->value ?? (string) ($sale->docSunatType?->value ?? $sale->docSunatType ?? '');
+        if ($docType !== DocSunatType::BOLETA->value) {
+            $queryKey = $duplicate ? 'duplicate' : 'edit';
+            $this->redirect(route('create-factura', [$queryKey => $saleId]), navigate: true);
+            return;
+        }
+
+        if (! $duplicate) {
+            if ($sale->status === DocumentStatus::APPROVED) {
+                Flux::toast(
+                    heading: 'Alerta',
+                    text: 'No se puede editar un comprobante aprobado',
+                    variant: 'warning',
+                    duration: 3000
+                );
+                $this->redirectRoute('vouchers', navigate: true);
+                return;
+            }
+
+            $this->editingSaleId = (string) $sale->id;
+            $this->savedSaleId = (string) $sale->id;
+        }
+
+        $data = $sale->toArray();
+
+        $this->sale->companyId = (string) ($data['companyId'] ?? $this->sale->companyId);
+        $this->sale->clientId = (string) ($data['clientId'] ?? $this->sale->clientId);
+        $this->sale->additionalInfo = $data['additionalInfo'] ?? null;
+
+        if (! $duplicate) {
+            $this->sale->dateIssue = $data['dateIssue'] ?? $this->sale->dateIssue;
+            $this->sale->dateExpiration = $data['dateExpiration'] ?? $this->sale->dateExpiration;
+        }
+
+        $this->items = $saleService->hydrateItemsForSunatFromDatabase($data['items'] ?? []);
+
+        $client = data_get($data, 'client');
+        $clientId = (string) ($data['clientId'] ?? '');
+        if ($clientId !== '' && is_array($client)) {
+            $label = (string) ((string) ($client['name'] ?? '') ?: (string) ($client['tradeName'] ?? ''));
+            $label = Str::limit($label, 12, '...') . ' - ' . (string) ($client['documentNumber'] ?? '');
+
+            $this->bolClient = 'show';
+            $this->selectedClientLabel = $label;
+            $this->clients = [
+                ['value' => $clientId, 'label' => $label],
+            ];
+        } else {
+            $this->bolClient = 'hide';
+            $this->clearClient();
+        }
+
+        $saleService->applyTotals($this->sale, $this->items);
     }
 
     public function editItem(int $index): void
@@ -136,6 +209,8 @@ new class extends Component
         $this->clients = [];
         $this->bolClient = 'hide';
         $this->selectedClientLabel = null;
+        $this->savedSaleId = null;
+        $this->editingSaleId = null;
 
         $this->sale->dateIssue = now('America/Lima')->format('Y-m-d H:i:s');
         $this->sale->dateExpiration = now('America/Lima')->format('Y-m-d H:i:s');
@@ -207,7 +282,7 @@ new class extends Component
         $saleService->applyTotals($this->sale, $this->items);
         $this->dispatch('reset-sale-item-modal');
     }
-    public function save(SunatService $sunatService, SerieService $serieService): void
+    public function save(SerieService $serieService): void    
     {
         if (! $this->sale->companyId) {
             Flux::toast(
@@ -220,27 +295,24 @@ new class extends Component
         }
         try {
             $this->sale->items = $this->items;
-            $result = $this->sale->store(
-                $this->saleItem,
-                $sunatService,
-                $serieService,
-                $this->discount
-            );
-            $response = $result['sunat'] ?? [];
-            $sunatSuccess = $response['sunatResponse']['success'] ?? false;
+            $result = filled($this->editingSaleId)
+                ? $this->sale->updateExisting($this->editingSaleId, $this->saleItem, $this->discount)
+                : $this->sale->store($this->saleItem, $serieService, $this->discount);
             Flux::toast(
-                heading: $sunatSuccess ? 'SUNAT' : 'Comprobante rechazado',
-                text: $sunatSuccess
-                    ? 'Comprobante aceptado por SUNAT'
-                    : ($response['sunatResponse']['error']['message'] ?? 'SUNAT rechazó el comprobante'),
-                variant: $sunatSuccess ? 'success' : 'warning',
-                duration: 4000
+                heading: 'Alerta',
+                text: filled($this->editingSaleId)
+                    ? 'El documento se actualizó con éxito'
+                    : 'El documento se guardó con éxito',
+                variant: 'success',
+                duration: 3000
             );
+            $this->savedSaleId = $result['saleId'];
             $this->openPdfPreview($result['pdfUrl'] ?? null);
+            Flux::modal('confirm')->show();
         } catch (\Throwable $th) {
             Flux::toast(
                 heading: 'Error',
-                text: $th->getMessage() ?: 'No se pudo guardar ni enviar el comprobante',
+                text: $th->getMessage() ?: 'No se pudo guardar el comprobante',
                 variant: 'warning',
                 duration: 4000
             );
@@ -518,6 +590,8 @@ new class extends Component
         new-action="startNewBoleta"
         list-action="goToVouchers"
     />
+
+    <livewire:send-modal :sale-id="$savedSaleId" :key="'send-modal-'.($savedSaleId ?? 'none')" />
 </div>
 
 @script

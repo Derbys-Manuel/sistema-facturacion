@@ -94,7 +94,7 @@ it('creates a sale document from the boleta page', function () {
         'doc_sunat_type' => DocSunatType::BOLETA->value,
         'serie' => 'B001',
         'correlative' => '00000002',
-        'status' => DocumentStatus::APPROVED->value,
+        'status' => DocumentStatus::DRAFT->value,
     ]);
 
     $saleDocumentId = SaleDocument::query()->value('id');
@@ -105,7 +105,7 @@ it('creates a sale document from the boleta page', function () {
     ]);
 });
 
-it('marks the sale document as observed when SUNAT accepts with notes', function () {
+it('marks the sale document as approved when SUNAT accepts', function () {
     app()->instance(SunatService::class, new class extends SunatService
     {
         public function send(array $data, SaleDocument $sale): array
@@ -185,15 +185,21 @@ it('marks the sale document as observed when SUNAT accepts with notes', function
         ->call('save')
         ->assertHasNoErrors();
 
+    $saleDocumentId = (string) SaleDocument::query()->value('id');
+
+    Livewire::test('send-modal', ['saleId' => $saleDocumentId])
+        ->call('sendSunat')
+        ->assertHasNoErrors();
+
     $this->assertDatabaseHas('sale_documents', [
         'company_id' => $company->id,
         'client_id' => $client->id,
         'doc_sunat_type' => DocSunatType::BOLETA->value,
-        'status' => DocumentStatus::OBSERVED->value,
+        'status' => DocumentStatus::APPROVED->value,
     ]);
 });
 
-it('marks the sale document as connection failed when SUNAT is unreachable', function () {
+it('marks the sale document as rejected when SUNAT is unreachable', function () {
     app()->instance(SunatService::class, new class extends SunatService
     {
         public function send(array $data, SaleDocument $sale): array
@@ -273,10 +279,121 @@ it('marks the sale document as connection failed when SUNAT is unreachable', fun
         ->call('save')
         ->assertHasNoErrors();
 
+    $saleDocumentId = (string) SaleDocument::query()->value('id');
+
+    Livewire::test('send-modal', ['saleId' => $saleDocumentId])
+        ->call('sendSunat')
+        ->assertHasNoErrors();
+
     $this->assertDatabaseHas('sale_documents', [
         'company_id' => $company->id,
         'client_id' => $client->id,
         'doc_sunat_type' => DocSunatType::BOLETA->value,
-        'status' => DocumentStatus::CONNECTION_FAILED->value,
+        'status' => DocumentStatus::REJECTED->value,
+    ]);
+});
+
+it('loads and updates a draft sale document from vouchers edit', function () {
+    $company = Company::create([
+        'company_name' => 'Test Company SAC',
+        'ruc' => '20123456789',
+        'sol_user' => 'TEST',
+        'sol_pass' => 'TEST',
+        'department' => 'LIMA',
+        'province' => 'LIMA',
+        'district' => 'LIMA',
+    ]);
+
+    Serie::create([
+        'doc_sunat_type' => DocSunatType::BOLETA->value,
+        'description' => 'Boleta',
+        'code' => 'B001',
+        'correlative' => '00000001',
+        'is_active' => true,
+        'company_id' => $company->id,
+    ]);
+
+    $client = Client::create([
+        'name' => 'Juan Perez',
+        'trade_name' => null,
+        'doc_identity_type' => DocIdentityType::DNI->value,
+        'document_number' => '12345678',
+        'address' => null,
+        'department' => 'LIMA',
+        'province' => 'LIMA',
+        'district' => 'LIMA',
+        'telephone' => null,
+        'is_active' => true,
+    ]);
+
+    $items = [
+        [
+            'igvAffectationType' => AffecType::GRAVADO->value,
+            'code' => 'P001',
+            'description' => 'Producto',
+            'unit' => 'NIU',
+            'quantity' => 1,
+            'unitValue' => 100,
+            'itemValue' => 100,
+            'unitPrice' => 118,
+            'igvBaseAmount' => 100,
+            'igvPercent' => 18,
+            'igvAmount' => 18,
+            'taxesTotal' => 18,
+            'discounts' => [],
+            'total' => 118,
+        ],
+    ];
+
+    Livewire::test('pages::sale.create-boleta')
+        ->set('sale.companyId', (string) $company->id)
+        ->set('sale.clientId', (string) $client->id)
+        ->set('items', $items)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $saleId = (string) SaleDocument::query()->value('id');
+
+    $updatedItems = [
+        [
+            'igvAffectationType' => AffecType::GRAVADO->value,
+            'code' => 'P001',
+            'description' => 'Producto',
+            'unit' => 'NIU',
+            'quantity' => 2,
+            'unitValue' => 100,
+            'itemValue' => 200,
+            'unitPrice' => 118,
+            'igvBaseAmount' => 200,
+            'igvPercent' => 18,
+            'igvAmount' => 36,
+            'taxesTotal' => 36,
+            'discounts' => [],
+            'total' => 236,
+        ],
+    ];
+
+    Livewire::withQueryParams(['edit' => $saleId])
+        ->test('pages::sale.create-boleta')
+        ->assertSet('editingSaleId', $saleId)
+        ->set('sale.companyId', (string) $company->id)
+        ->set('sale.clientId', (string) $client->id)
+        ->set('items', $updatedItems)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(SaleDocument::count())->toBe(1);
+
+    $this->assertDatabaseHas('sale_documents', [
+        'id' => $saleId,
+        'serie' => 'B001',
+        'correlative' => '00000002',
+        'status' => DocumentStatus::DRAFT->value,
+    ]);
+
+    $this->assertDatabaseHas('sale_document_items', [
+        'sale_document_id' => $saleId,
+        'code' => 'P001',
+        'quantity' => 2,
     ]);
 });

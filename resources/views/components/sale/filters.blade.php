@@ -9,7 +9,7 @@
     'resetAction' => 'resetFilters',
 ])
 
-<div class="grid w-full gap-2 sm:w-auto sm:grid-cols-6 sm:items-end">
+<div class="flex w-full items-center gap-2">
     <x-form.input
         wire:model.live.debounce.300ms="{{ $qModel }}"
         placeholder="Buscar por cliente, serie o correlativo..."

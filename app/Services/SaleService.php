@@ -186,7 +186,50 @@ class SaleService
             $discountRecalculateFrom
         );
     }
+    public function hydrateItemsForSunatFromDatabase(array $items): array
+    {
+        return collect($items)
+            ->map(function ($item) {
+                if (! is_array($item)) {
+                    return $item;
+                }
+                $discounts = $item['discounts'] ?? [];
+                if (! is_array($discounts)) {
+                    $discounts = [];
+                }
+                $payload = [
+                    'igvAffectationType' => (string) ($item['igvAffectationType'] ?? AffecType::GRAVADO->value),
+                    'code' => (string) ($item['code'] ?? '00000'),
+                    'description' => (string) ($item['description'] ?? 'PRODUCTO'),
+                    'unit' => (string) ($item['unit'] ?? 'NIU'),
+                    'quantity' => (string) ($item['quantity'] ?? '1'),
+                    'unitPrice' => (string) ($item['unitPrice'] ?? '0'),
+                    'igvPercent' => (string) ($item['igvPercent'] ?? '18'),
+                    'discounts' => $discounts,
+                ];
 
+                $calculated = $this->calculateItem($payload);
+                $calculated['unitValue'] = (string) ($item['unitValue'] ?? $calculated['unitValue']);
+                $calculated['itemValue'] = (string) ($item['itemValue'] ?? $calculated['itemValue']);
+                $calculated['saleValue'] = (string) ($item['saleValue'] ?? $calculated['saleValue']);
+                $calculated['igvBaseAmount'] = (string) ($item['igvBaseAmount'] ?? $calculated['igvBaseAmount']);
+                $calculated['igvAmount'] = (string) ($item['igvAmount'] ?? $calculated['igvAmount']);
+                $calculated['igv'] = (string) ($item['igv'] ?? $calculated['igv']);
+                $calculated['totalTaxes'] = (string) ($item['totalTaxes'] ?? $calculated['totalTaxes']);
+                $calculated['taxesTotal'] = (string) ($item['taxesTotal'] ?? $calculated['taxesTotal']);
+
+                $discountAmount = (float) data_get($item, 'discounts.0.discountAmount', 0);
+                $quantity = (float) ($calculated['quantity'] ?? 0);
+                if ($discountAmount > 0 && $quantity > 0) {
+                    $lineTotalWithTaxes = (float) ($calculated['itemValue'] ?? 0) + (float) ($calculated['totalTaxes'] ?? 0);
+                    $unitPriceWithDiscount = round($lineTotalWithTaxes / $quantity, 2);
+                    $calculated['unitPriceWithDiscount'] = number_format($unitPriceWithDiscount, 2, '.', '');
+                }
+                return $calculated;
+            })
+            ->values()
+            ->all();
+    }
     public function calculateTotals(array $items): array
     {
         $totalTaxed = $this->sumWhere($items, 'igvAffectationType', AffecType::GRAVADO->value, 'itemValue', self::SCALE_BASE);

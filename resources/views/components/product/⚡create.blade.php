@@ -61,7 +61,7 @@ new class extends Component
                 </span>
             </div>
         </div>
-        <div class="border-b border-emerald-100 bg-emerald-50/70 px-5 py-4">
+        <div class="border-b px-5 py-4">
             <div class="flex items-start justify-between gap-4">
                 <div class="flex items-start gap-3">
                     <div class="mt-0.5 flex size-9 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
