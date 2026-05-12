@@ -2,6 +2,7 @@
 
 use App\Enums\Sunat\DocSunatType;
 use App\Enums\Sunat\OperationType;
+use App\Enums\DocumentStatus;
 use App\Livewire\Forms\SaleForm;
 use Illuminate\Support\Carbon;
 use Livewire\Component;
@@ -296,23 +297,25 @@ new class extends Component
                         </flux:tooltip.content>
                     </flux:tooltip>
                 </x-ui.table.cell>
-                <x-ui.table.cell>
-                    <div class="flex items-center gap-2">
-                        <x-form.button
-                            variant="success"
-                            size="xs"
-                            type="button"
-                            leftIcon="document"
-                            wire:click="previewPdf('{{ $row['id'] }}')"
-                        />
-                        <x-form.button
-                            variant="ghost"
-                            size="xs"
-                            type="button"
-                            leftIcon="paper-airplane"
-                            wire:click="confirmSend('{{ $row['id'] }}')"
-                        />
-                    </div>
+                <x-ui.table.cell class="flex justify-center" >
+                    <flux:dropdown>
+                        <flux:button icon:trailing="ellipsis-horizontal" size="sm"></flux:button>
+                        <flux:menu>
+                            @if ($row['status'] === DocumentStatus::DRAFT->value)
+                                <flux:menu.item icon="paper-airplane"
+                                wire:click="confirmSend('{{ $row['id'] }}')">
+                                    Enviar a sunat
+                                </flux:menu.item>
+                            @endif
+                            <flux:menu.item icon="document-magnifying-glass"
+                            wire:click="previewPdf('{{ $row['id'] }}')">
+                                Abrir pdf
+                            </flux:menu.item>
+                            <flux:menu.item icon="trash">
+                                Eliminar
+                            </flux:menu.item>
+                        </flux:menu>
+                    </flux:dropdown>
                 </x-ui.table.cell>
             </tr>
         @empty
