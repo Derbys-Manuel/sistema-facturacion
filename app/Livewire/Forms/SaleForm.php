@@ -225,7 +225,6 @@ class SaleForm extends Form
             ->all();
         return [
             'saleId' => (string) $sale->id,
-            'pdfUrl' => $response['pdfUrl'] ?? route('sale.pdf', $sale->id),
         ];
     }
     public function send(string $saleId, SunatService $sunatService, SaleService $saleService): array
@@ -249,6 +248,7 @@ class SaleForm extends Form
         return ['sunat' => $response];
     }
     public function list(
+        ?bool $deletedBool = null,
         ?string $from = null,
         ?string $to = null,
         ?string $q = null,
@@ -257,6 +257,7 @@ class SaleForm extends Form
         ?string $companyId = null,
     ): array {
         return $this->documentsQuery(
+            deletedBool: $deletedBool,
             from: $from,
             to: $to,
             q: $q,
@@ -270,6 +271,7 @@ class SaleForm extends Form
             ->toArray();
     }
     public function summary(
+        ?bool $deletedBool = null,
         ?string $from = null,
         ?string $to = null,
         ?string $q = null,
@@ -278,6 +280,7 @@ class SaleForm extends Form
         ?string $companyId = null,
     ): array {
         $query = $this->documentsQuery(
+            deletedBool: $deletedBool,
             from: $from,
             to: $to,
             q: $q,
@@ -307,6 +310,7 @@ class SaleForm extends Form
     }
 
     private function documentsQuery(
+        ?bool $deletedBool = null,
         ?string $from = null,
         ?string $to = null,
         ?string $q = null,
@@ -318,6 +322,14 @@ class SaleForm extends Form
 
         return SaleDocument::query()
             ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
+            ->when(
+                $deletedBool,
+                fn ($query) => $query->where('sunat_state', false),
+                fn ($query) => $query->where(function ($q) {
+                    $q->where('sunat_state', true)
+                    ->orWhereNull('sunat_state');
+                })
+            )
             ->when($from, fn ($query) => $query->whereDate('date_issue', '>=', $from))
             ->when($to, fn ($query) => $query->whereDate('date_issue', '<=', $to))
             ->when($docSunatType, fn ($query) => $query->where('doc_sunat_type', $docSunatType))

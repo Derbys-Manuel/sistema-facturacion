@@ -9,11 +9,13 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\On;
 use Flux\Flux;
+use App\Models\SaleDocument;
 
 new class extends Component
 {
     use WithPagination;
     public SaleForm $sale;
+    public ?bool $deletedBool = null;
     public ?string $from = null;
     public ?string $to = null;
     public ?string $q = null;
@@ -60,6 +62,7 @@ new class extends Component
         $now = Carbon::now('America/Lima');
         $this->from = $now->copy()->startOfMonth()->toDateString();
         $this->to = $now->toDateString();
+        $this->deletedBool = false;
     }
 
     public function updatedFrom(): void { $this->resetPage(); }
@@ -80,6 +83,7 @@ new class extends Component
         }
 
         return $this->sale->summary(
+            deletedBool: $this->deletedBool,
             from: $this->from,
             to: $this->to,
             q: $this->q,
@@ -107,6 +111,7 @@ new class extends Component
         }
 
         return $this->sale->list(
+            deletedBool: $this->deletedBool,
             from: $this->from,
             to: $this->to,
             q: $this->q,
@@ -171,7 +176,6 @@ new class extends Component
 
             return;
         }
-
         $this->openPdfPreview(route('sale.pdf', $saleId));
     }
 
@@ -190,7 +194,11 @@ new class extends Component
         $this->sendSaleId = $saleId;
         Flux::modal('confirm')->show();
     }
-
+    public function delete(string $id){
+        SaleDocument::where('id', $id)->update([
+            'sunat_state'=> false
+        ]);
+    }
     public function startNewInvoice(): void
     {
         $this->closePdfPreview();
@@ -234,12 +242,31 @@ new class extends Component
             :decimals="2"
         />
     </div>
-    <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div class="grid grid-cols-[0.6fr_auto] items-start gap-3 mb-1">
         <x-sale.filters
             :doc-sunat-type-options="$this->docSunatTypeOptions"
             :operation-type-options="$this->operationTypeOptions"
             reset-action="resetFilters"
         />
+        <div class="relative mt-2">
+            <div
+                wire:loading.flex
+                wire:target="deletedBool"
+                class="absolute inset-0 z-10 hidden cursor-not-allowed items-center rounded-sm bg-white/60"
+            ></div>
+            <flux:field variant="inline">
+                <flux:checkbox
+                    wire:model.live="deletedBool"
+                    wire:loading.attr="disabled"
+                    wire:target="deletedBool"
+                    style="--color-accent: #059669;"
+                />
+                <flux:label class="text-xs">
+                    Listar documentos eliminados
+                </flux:label>
+                <flux:error name="deletedBool" />
+            </flux:field>
+        </div>
     </div>
     <x-ui.table :columns="['Fecha', 'Documento', 'Cliente', 'Tipo', 'Total', 'Estado', 'Acciones']" striped>
         @forelse ($documents['data'] as $row)
