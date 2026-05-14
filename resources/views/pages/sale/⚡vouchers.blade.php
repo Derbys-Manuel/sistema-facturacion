@@ -350,6 +350,17 @@ new class extends Component
                                     <p class="text-white">
                                         Código: {{ data_get($cdr, 'cdrResponse.code', '-') }}
                                     </p>
+                                    @php($notes = data_get($cdr, 'cdrResponse.notes'))
+                                    @if (is_array($notes) && count($notes))
+                                        <p class="text-white font-semibold">Notas:</p>
+                                        <ul class="list-disc pl-4 text-white">
+                                            @foreach ($notes as $note)
+                                                <li>{{ $note }}</li>
+                                            @endforeach
+                                        </ul>
+                                    @else
+                                        <p class="text-white">Notas: -</p>
+                                    @endif
                                     <p class="text-white">
                                         {{ data_get($cdr, 'cdrResponse.description', '-') }}
                                     </p>
@@ -358,6 +369,17 @@ new class extends Component
                                     <p class="text-white">
                                         Código: {{ data_get($cdr, 'error.code', '-') }}
                                     </p>
+                                    @php($notes = data_get($cdr, 'cdrResponse.notes'))
+                                    @if (is_array($notes) && count($notes))
+                                        <p class="text-white font-semibold">Notas:</p>
+                                        <ul class="list-disc pl-4 text-white">
+                                            @foreach ($notes as $note)
+                                                <li>{{ $note }}</li>
+                                            @endforeach
+                                        </ul>
+                                    @else
+                                        <p class="text-white">Notas: -</p>
+                                    @endif
                                     <p class="text-white">
                                         {{ data_get($cdr, 'error.message', '-') }}
                                     </p>
