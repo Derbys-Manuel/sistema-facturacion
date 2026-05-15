@@ -14,6 +14,7 @@ use Greenter\Model\Company\Company;
 use Greenter\Model\Sale\FormaPagos\FormaPagoContado;
 use Greenter\Model\Sale\Invoice;
 use Greenter\Model\Sale\Legend;
+use Greenter\Model\Sale\Note;
 use Greenter\Model\Sale\SaleDetail;
 use Greenter\Report\HtmlReport;
 use Greenter\Report\PdfReport;
@@ -103,6 +104,35 @@ class SunatService
                 $invoice->setDescuentos($this->mapDiscountsToCharges($documentDiscounts));
             }
         return $invoice;
+    }
+    public function getNote($data, SaleDocument $sale){
+        return(new Note())
+        ->setUblVersion($data['ublVersion'] ?? '2.1')
+        ->setTipoDoc($data['docSunatType'] ?? null) // Factura - Catalog. 01 
+        ->setSerie($data['serie'] ?? null)
+        ->setCorrelativo($data['correlative'] ?? null)
+        ->setFechaEmision(new DateTime($data['dateIssue'] ?? null)) // Zona horaria: Lima
+        ->setTipDocAfectado($data['docAfectType'] ?? null)
+        ->setNumDocfectado($data['docNumAfect'] ?? null)
+        ->setCodMotivo($data['reasonCode'] ?? null)
+        ->setTipoMoneda($data['currency'] ?? null) // Sol - Catalog. 02
+        ->setCompany($this->getCompany($sale->company))
+        ->setClient($this->getClient($sale->client ?? null))
+        ->setMtoOperGravadas($data['totalTaxed'] ?? null)
+        ->setMtoOperExoneradas($data['totalExempted'] ?? null)
+        ->setMtoOperInafectas($data['totalUnaffected'] ?? null)
+        ->setMtoOperExportacion($data['totalExport'] ?? null)
+        ->setMtoOperGratuitas($data['totalFree'] ?? null)
+        ->setMtoIGV($data['totalIgv'])
+        ->setMtoIGVGratuitas($data['totalIgvFree'])
+        ->setIcbper($data['icbper'])
+        ->setTotalImpuestos($data['totalTaxes'])
+        ->setValorVenta($data['saleValue'])
+        ->setSubTotal($data['subTotal'])
+        ->setRedondeo($data['rounding'])
+        ->setMtoImpVenta($data['total'])
+        ->setDetails($this->getDetails($data['items']))
+        ->setLegends($this->getLegends($data['legends']));
     }
     public function getCompany(CompanyModels $company)
     {
