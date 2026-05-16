@@ -411,4 +411,57 @@ class SaleService
     {
         return (string) $value->toScale($scale, RoundingMode::HALF_UP);
     }
+
+    public function normalizeItemDiscountForSunat(array $item): array
+    {
+        $quantity = $this->bd($item['quantity'] ?? '1');
+        if ($quantity->isLessThanOrEqualTo('0')) {
+            $quantity = $this->bd('1');
+        }
+
+        $unitValue = $this->bd($item['unitValue'] ?? '0');
+        $lineExtension = $this->bd($item['itemValue'] ?? $item['saleValue'] ?? '0');
+
+        $baseAmount = $unitValue
+            ->multipliedBy($quantity)
+            ->toScale(self::SCALE_MONEY, RoundingMode::HALF_UP);
+
+        $lineExtension = $lineExtension->toScale(self::SCALE_MONEY, RoundingMode::HALF_UP);
+
+        $discountAmount = $baseAmount->minus($lineExtension)->toScale(self::SCALE_DISCOUNT, RoundingMode::HALF_UP);
+
+        if ($discountAmount->isLessThanOrEqualTo('0')) {
+            return $item;
+        }
+
+        $factor = $baseAmount->isGreaterThan('0')
+            ? $discountAmount->dividedBy($baseAmount, self::SCALE_FACTOR, RoundingMode::HALF_UP)
+            : $this->bd('0')->toScale(self::SCALE_FACTOR);
+
+        $normalized = [
+            'type' => DiscountType::ITEM->value,
+            'baseAmount' => $this->format($baseAmount, self::SCALE_MONEY),
+            'factorPorcentage' => $this->format($factor, self::SCALE_FACTOR),
+            'discountAmount' => $this->format($discountAmount, self::SCALE_DISCOUNT),
+            'uiPercent' => $this->format($factor->multipliedBy('100'), self::SCALE_MONEY),
+            'enabled' => true,
+            'mode' => 'amount',
+            'applyTo' => 'base',
+        ];
+
+        $item['discounts'] = [$normalized];
+
+        $taxesTotal = $this->bd($item['totalTaxes'] ?? $item['taxesTotal'] ?? '0')
+            ->toScale(self::SCALE_MONEY, RoundingMode::HALF_UP);
+
+        $unitPriceWithDiscount = $quantity->isGreaterThan('0')
+            ? $lineExtension
+                ->plus($taxesTotal)
+                ->dividedBy($quantity, self::SCALE_MONEY, RoundingMode::HALF_UP)
+            : $this->bd('0')->toScale(self::SCALE_MONEY);
+
+        $item['unitPriceWithDiscount'] = $this->format($unitPriceWithDiscount, self::SCALE_MONEY);
+
+        return $item;
+    }
 }

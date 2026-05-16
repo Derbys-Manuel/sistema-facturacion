@@ -309,9 +309,12 @@ new class extends Component
 
     public function resetForm(): void
     {
+        $companyId = $this->sale->companyId;
+
         $this->sale->reset();
         $this->saleItem->reset();
         $this->discount->reset();
+        $this->sale->companyId = $companyId;
 
         $this->items = [];
         $this->affectedDocuments = [];
