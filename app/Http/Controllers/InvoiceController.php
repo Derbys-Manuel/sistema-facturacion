@@ -16,8 +16,8 @@ class InvoiceController extends Controller
 
         $data = $sale->toArray();
         $sunatService->setLegends($data);
-        $invoice = $sunatService->getInvoice($data, $sale);
-        $pdf = $sunatService->generatePdfReport($invoice, company: $sale->company, hash: $sale->hash);
+        $document = $sunatService->getDocument($data, $sale);
+        $pdf = $sunatService->generatePdfReport($document, company: $sale->company, hash: $sale->hash);
         $filename = sprintf('%s-%s.pdf', $sale->serie ?? 'N-A', $sale->correlative ?? 'N-A');
         return response($pdf, 200, [
             'Content-Type' => 'application/pdf',

@@ -6,3 +6,9 @@ test('vouchers page renders', function () {
         ->assertSee('TOTAL')
         ->assertSee('IGV');
 });
+
+test('nota credito page renders', function () {
+    $this->get(route('create-nota-credito'))
+        ->assertOk()
+        ->assertSee('Documento afectado');
+});

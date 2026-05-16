@@ -36,6 +36,9 @@
                 <flux:sidebar.item icon="banknotes" :href="route('create-factura')" :current="request()->routeIs('create-factura')" wire:navigate>
                     {{ __('Factura') }}
                 </flux:sidebar.item>
+                <flux:sidebar.item icon="document-text" :href="route('create-nota-credito')" :current="request()->routeIs('create-nota-credito')" wire:navigate>
+                    {{ __('Nota de crédito') }}
+                </flux:sidebar.item>
             </flux:sidebar.nav>
             <flux:spacer />
             <flux:sidebar.nav>
