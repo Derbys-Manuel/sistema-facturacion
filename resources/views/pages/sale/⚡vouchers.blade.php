@@ -188,6 +188,7 @@ new class extends Component
         $route = match ($docSunatType) {
             DocSunatType::FACTURA->value => 'create-factura',
             DocSunatType::BOLETA->value => 'create-boleta',
+            DocSunatType::NOTA_CREDITO->value => 'create-nota-credito',
             default => 'create-boleta',
         };
 
@@ -199,6 +200,7 @@ new class extends Component
         $route = match ($docSunatType) {
             DocSunatType::FACTURA->value => 'create-factura',
             DocSunatType::BOLETA->value => 'create-boleta',
+            DocSunatType::NOTA_CREDITO->value => 'create-nota-credito',
             default => 'create-boleta',
         };
 
