@@ -356,6 +356,35 @@ class SaleForm extends Form
 
         $data = $sale->toArray();
         $data['items'] = $saleService->hydrateItemsForSunatFromDatabase($data['items'] ?? []);
+
+        $docSunatType = (string) ($data['docSunatType'] ?? '');
+        if (in_array($docSunatType, [DocSunatType::NOTA_CREDITO->value, DocSunatType::NOTA_DEBITO->value], true)) {
+            $data['items'] = collect($data['items'])
+                ->map(fn ($item) => is_array($item) ? $saleService->normalizeItemDiscountForSunat($item) : $item)
+                ->all();
+        }
+
+        if ($docSunatType === DocSunatType::NOTA_CREDITO->value) {
+            $affectedSaleDocumentId = (string) ($data['affectedSaleDocumentId'] ?? '');
+            if (filled($affectedSaleDocumentId)) {
+                $affected = SaleDocument::query()->find($affectedSaleDocumentId);
+
+                if ($affected) {
+                    $creditNoteTotal = round((float) ($data['total'] ?? 0), 2);
+                    $affectedTotal = round((float) ($affected->total ?? 0), 2);
+
+                    if ($creditNoteTotal > $affectedTotal) {
+                        return [
+                            'sunat' => [
+                                'success' => false,
+                                'error' => "La nota de crédito no puede exceder el total del comprobante afectado ({$affectedTotal}).",
+                            ],
+                        ];
+                    }
+                }
+            }
+        }
+
         $response = $sunatService->send($data, $sale);
         $sunatSuccess = $response['sunatResponse']['success'] ?? false;
         $sale->update([

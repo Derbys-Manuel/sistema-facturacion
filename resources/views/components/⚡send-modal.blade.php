@@ -4,6 +4,7 @@ use App\Enums\DocumentStatus;
 use App\Models\SaleDocument;
 use App\Services\SaleService;
 use App\Services\SunatService;
+use App\Enums\Sunat\DocSunatType;
 use Flux\Flux;
 use Livewire\Component;
 
@@ -55,6 +56,48 @@ new class extends Component
                 })
                 ->values()
                 ->all();
+
+            $docSunatType = (string) ($data['docSunatType'] ?? '');
+            if (in_array($docSunatType, [DocSunatType::NOTA_CREDITO->value, DocSunatType::NOTA_DEBITO->value], true)) {
+                $data['items'] = collect($data['items'])
+                    ->map(fn ($item) => is_array($item) ? $saleService->normalizeItemDiscountForSunat($item) : $item)
+                    ->map(function ($item) {
+                        if (! is_array($item)) {
+                            return $item;
+                        }
+
+                        $item['discounts'] = collect($item['discounts'] ?? [])
+                            ->filter(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)
+                            ->values()
+                            ->all();
+
+                        return $item;
+                    })
+                    ->values()
+                    ->all();
+            }
+
+            if ($docSunatType === DocSunatType::NOTA_CREDITO->value) {
+                $affectedSaleDocumentId = (string) ($data['affectedSaleDocumentId'] ?? '');
+                if (filled($affectedSaleDocumentId)) {
+                    $affected = SaleDocument::query()->find($affectedSaleDocumentId);
+
+                    if ($affected) {
+                        $creditNoteTotal = round((float) ($data['total'] ?? 0), 2);
+                        $affectedTotal = round((float) ($affected->total ?? 0), 2);
+
+                        if ($creditNoteTotal > $affectedTotal) {
+                            Flux::toast(
+                                heading: 'Alerta',
+                                text: 'La nota de crédito no puede exceder el total del comprobante afectado.',
+                                variant: 'warning',
+                                duration: 4000
+                            );
+                            return;
+                        }
+                    }
+                }
+            }
             $response = $sunatService->send($data, $sale);
             $sunatSuccess = $response['sunatResponse']['success'] ?? false;
             $sale->update([
