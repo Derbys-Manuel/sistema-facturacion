@@ -11,6 +11,7 @@ use App\Enums\Sunat\PaymentForm;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\SaleDocument;
+use App\Models\SaleDocumentItem;
 use App\Models\Serie;
 use App\Services\SerieService;
 use Livewire\Livewire;
@@ -134,4 +135,137 @@ it('creates a credit note from the nota credito page', function () {
         'note_reason_description' => 'AnulaciÃ³n de la operaciÃ³n',
         'status' => DocumentStatus::DRAFT->value,
     ]);
+});
+
+it('prefills the credit note page from an approved voucher', function () {
+    $company = Company::create([
+        'company_name' => 'Test Company SAC',
+        'ruc' => '20123456789',
+        'sol_user' => 'TEST',
+        'sol_pass' => 'TEST',
+        'department' => 'LIMA',
+        'province' => 'LIMA',
+        'district' => 'LIMA',
+    ]);
+
+    $client = Client::create([
+        'name' => 'Juan Perez',
+        'trade_name' => null,
+        'doc_identity_type' => DocIdentityType::DNI->value,
+        'document_number' => '12345678',
+        'address' => null,
+        'department' => 'LIMA',
+        'province' => 'LIMA',
+        'district' => 'LIMA',
+        'telephone' => null,
+        'is_active' => true,
+    ]);
+
+    $affected = SaleDocument::create([
+        'document_type' => DocumentType::SALE->value,
+        'ubl_version' => '2.1',
+        'doc_sunat_type' => DocSunatType::BOLETA->value,
+        'operation_type' => OperationType::INTERNAL_SALE->value,
+        'payment_form' => PaymentForm::CASH->value,
+        'currency' => 'PEN',
+        'serie' => 'B001',
+        'correlative' => '00000010',
+        'total_taxed' => 100,
+        'total_exempted' => 0,
+        'total_unaffected' => 0,
+        'total_export' => 0,
+        'total_free' => 0,
+        'total_igv' => 18,
+        'total_igv_free' => 0,
+        'icbper' => 0,
+        'total_taxes' => 18,
+        'sale_value' => 100,
+        'sub_total' => 118,
+        'total_sale' => 118,
+        'rounding' => 0,
+        'total' => 118,
+        'date_issue' => now('America/Lima'),
+        'date_expiration' => now('America/Lima'),
+        'additional_info' => null,
+        'status' => DocumentStatus::APPROVED->value,
+        'company_id' => $company->id,
+        'client_id' => $client->id,
+        'sunat_state' => true,
+    ]);
+
+    SaleDocumentItem::create([
+        'code' => 'P001',
+        'description' => 'Producto',
+        'unit' => 'NIU',
+        'quantity' => 1,
+        'unit_value' => 100,
+        'unit_price' => 118,
+        'item_value' => 100,
+        'igv_affectation_type' => AffecType::GRAVADO->value,
+        'igv_base_amount' => 100,
+        'igv_percent' => 18,
+        'igv_amount' => 18,
+        'icbper_factor' => null,
+        'icbper_amount' => 0,
+        'total_taxes' => 18,
+        'is_active' => true,
+        'sale_document_id' => $affected->id,
+    ]);
+
+    Livewire::withQueryParams(['affected' => (string) $affected->id])
+        ->test('pages::sale.create-nota-credito')
+        ->assertSet('sale.affectedSaleDocumentId', (string) $affected->id)
+        ->assertSet('sale.affectedDocSunatType', DocSunatType::BOLETA->value)
+        ->assertSet('sale.affectedSerie', 'B001')
+        ->assertSet('sale.affectedCorrelative', '00000010')
+        ->assertSet('sale.companyId', (string) $company->id)
+        ->assertSet('sale.clientId', (string) $client->id)
+        ->assertSet('items.0.code', 'P001')
+        ->assertSet('items.0.description', 'Producto');
+});
+
+it('searches clients based on affected doc type', function () {
+    $dniClient = Client::create([
+        'name' => 'Juan Perez',
+        'trade_name' => null,
+        'doc_identity_type' => DocIdentityType::DNI->value,
+        'document_number' => '12345678',
+        'address' => null,
+        'department' => 'LIMA',
+        'province' => 'LIMA',
+        'district' => 'LIMA',
+        'telephone' => null,
+        'is_active' => true,
+    ]);
+
+    $rucClient = Client::create([
+        'name' => null,
+        'trade_name' => 'Juan Perez SAC',
+        'doc_identity_type' => DocIdentityType::RUC->value,
+        'document_number' => '20123456789',
+        'address' => null,
+        'department' => 'LIMA',
+        'province' => 'LIMA',
+        'district' => 'LIMA',
+        'telephone' => null,
+        'is_active' => true,
+    ]);
+
+    $component = Livewire::test('pages::sale.create-nota-credito')
+        ->set('sale.affectedDocSunatType', DocSunatType::BOLETA->value)
+        ->call('searchClient', 'Juan');
+
+    $boletaResults = $component->get('clients');
+
+    expect(collect($boletaResults)->pluck('value')->all())->toContain((string) $dniClient->id);
+    expect(collect($boletaResults)->pluck('value')->all())->toContain((string) $rucClient->id);
+
+    $component
+        ->set('sale.affectedDocSunatType', DocSunatType::FACTURA->value)
+        ->call('searchClient', 'Juan');
+
+    $facturaResults = $component->get('clients');
+
+    expect(collect($facturaResults)->pluck('value')->all())->not->toContain((string) $dniClient->id);
+    expect(collect($facturaResults)->pluck('value')->all())->toContain((string) $rucClient->id);
 });

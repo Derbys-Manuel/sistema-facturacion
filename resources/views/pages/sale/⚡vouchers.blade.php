@@ -217,6 +217,50 @@ new class extends Component
         $this->redirect(route($route, ['edit' => $saleId]), navigate: true);
     }
 
+    public function createCreditNote(?string $saleId = null): void
+    {
+        if (blank($saleId)) {
+            Flux::toast(
+                heading: 'Alerta',
+                text: 'No se encontró el comprobante',
+                variant: 'warning',
+                duration: 2500
+            );
+
+            return;
+        }
+
+        $sale = SaleDocument::query()
+            ->select(['id', 'status', 'doc_sunat_type'])
+            ->findOrFail($saleId);
+
+        $docSunatType = $sale->doc_sunat_type?->value ?? (string) $sale->doc_sunat_type;
+
+        if ($sale->status !== DocumentStatus::APPROVED) {
+            Flux::toast(
+                heading: 'Alerta',
+                text: 'Solo puede generar nota de crédito desde comprobantes aprobados',
+                variant: 'warning',
+                duration: 2500
+            );
+
+            return;
+        }
+
+        if (! in_array($docSunatType, [DocSunatType::BOLETA->value, DocSunatType::FACTURA->value], true)) {
+            Flux::toast(
+                heading: 'Alerta',
+                text: 'Tipo de comprobante no válido para nota de crédito',
+                variant: 'warning',
+                duration: 2500
+            );
+
+            return;
+        }
+
+        $this->redirect(route('create-nota-credito', ['affected' => $saleId]), navigate: true);
+    }
+
     public function delete(string $id){
         SaleDocument::where('id', $id)->update([
             'sunat_state'=> false
@@ -249,7 +293,7 @@ new class extends Component
 <div class="relative">
     <div
         wire:loading.flex
-        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore"
+        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
         class="fixed inset-0 z-[99999] hidden items-center justify-center bg-white/60 backdrop-blur-[1px]"
     >
         <div class="flex items-center gap-2 rounded-md bg-white px-4 py-3 shadow">
@@ -395,42 +439,56 @@ new class extends Component
                                 icon:trailing="ellipsis-horizontal"
                                 size="sm"
                                 wire:loading.attr="disabled"
-                                wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore"
+                                wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
                             />                            
                             <flux:menu>
                                 <flux:menu.item
                                     icon="document-duplicate"
                                     wire:click="duplicateSale('{{ $row['id'] }}', '{{ $row['docSunatType'] ?? '' }}')"
                                     wire:loading.attr="disabled"
-                                    wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore"    
+                                    wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"    
                                 >
                                     Duplicar
                                 </flux:menu.item>
-                                    @if (in_array($row['status'] ?? null, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value], true))                                    <flux:menu.item
+                                    @if (
+                                        ($row['status'] ?? null) === DocumentStatus::APPROVED->value
+                                        && in_array($row['docSunatType'] ?? null, [DocSunatType::BOLETA->value, DocSunatType::FACTURA->value], true)
+                                    )
+                                        <flux:menu.item
+                                            icon="document-text"
+                                            wire:click="createCreditNote('{{ $row['id'] }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                        >
+                                            Nota de crédito
+                                        </flux:menu.item>
+                                    @endif
+                                    @if (in_array($row['status'] ?? null, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value], true))
+                                    <flux:menu.item
                                         icon="pencil"
                                         wire:click="editSale('{{ $row['id'] }}', '{{ $row['docSunatType'] ?? '' }}')"
                                         wire:loading.attr="disabled"
-                                        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore"
+                                        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
                                     >
                                         Editar
                                     </flux:menu.item>
                                 @endif
-                                @if ($row['status'] === DocumentStatus::DRAFT->value)
-                                    <flux:menu.item icon="paper-airplane"
-                                    wire:click="confirmSend('{{ $row['id'] }}')"
-                                    wire:loading.attr="disabled"
-                                    wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore"
-                                    >
-                                        Enviar a sunat
-                                    </flux:menu.item>
-                                @endif
-                                <flux:menu.item icon="document-magnifying-glass"
-                                wire:click="previewPdf('{{ $row['id'] }}')"
-                                wire:loading.attr="disabled"
-                                wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore"
-                                >
-                                    Abrir pdf
-                                </flux:menu.item>
+                                 @if ($row['status'] === DocumentStatus::DRAFT->value)
+                                     <flux:menu.item icon="paper-airplane"
+                                     wire:click="confirmSend('{{ $row['id'] }}')"
+                                     wire:loading.attr="disabled"
+                                     wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                     >
+                                         Enviar a sunat
+                                     </flux:menu.item>
+                                 @endif
+                                 <flux:menu.item icon="document-magnifying-glass"
+                                 wire:click="previewPdf('{{ $row['id'] }}')"
+                                 wire:loading.attr="disabled"
+                                 wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                 >
+                                     Abrir pdf
+                                 </flux:menu.item>
                                 @if(
                                     (
                                         $row['sunatState'] === null ||
@@ -439,22 +497,22 @@ new class extends Component
                                     && data_get($cdr, 'success') === false ||
                                     $row['status'] === DocumentStatus::DRAFT->value
                                 )
-                                    <flux:menu.item icon="trash" 
-                                    wire:click="delete('{{ $row['id'] }}')"
-                                    wire:loading.attr="disabled"
-                                    wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore"
-                                    >
-                                        Eliminar
-                                    </flux:menu.item>
-                                @endif
-                                @if($row['sunatState'] === false)
-                                    <flux:menu.item icon="arrow-path" 
-                                    wire:click="restore('{{ $row['id'] }}')"
-                                    wire:loading.attr="disabled"
-                                    wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore">
-                                        Restaurar
-                                    </flux:menu.item>
-                                @endif
+                                     <flux:menu.item icon="trash" 
+                                     wire:click="delete('{{ $row['id'] }}')"
+                                     wire:loading.attr="disabled"
+                                     wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                     >
+                                         Eliminar
+                                     </flux:menu.item>
+                                 @endif
+                                 @if($row['sunatState'] === false)
+                                     <flux:menu.item icon="arrow-path" 
+                                     wire:click="restore('{{ $row['id'] }}')"
+                                     wire:loading.attr="disabled"
+                                     wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote">
+                                         Restaurar
+                                     </flux:menu.item>
+                                 @endif
                             </flux:menu>
                         </flux:dropdown>
                     </x-ui.table.cell>

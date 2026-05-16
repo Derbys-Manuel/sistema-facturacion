@@ -56,8 +56,11 @@ new class extends Component
 
         $editSaleId = request()->query('edit');
         $duplicateSaleId = request()->query('duplicate');
+        $affectedSaleId = request()->query('affected');
 
-        if (filled($editSaleId)) {
+        if (filled($affectedSaleId)) {
+            $this->selectAffectedDocument($saleService, (string) $affectedSaleId);
+        } elseif (filled($editSaleId)) {
             $this->loadSaleIntoForm((string) $editSaleId, duplicate: false, saleService: $saleService);
         } elseif (filled($duplicateSaleId)) {
             $this->loadSaleIntoForm((string) $duplicateSaleId, duplicate: true, saleService: $saleService);
@@ -69,21 +72,16 @@ new class extends Component
         $sale = SaleDocument::query()
             ->with(['items.discounts', 'discounts', 'client', 'company'])
             ->findOrFail($saleId);
-
         $docType = $sale->doc_sunat_type?->value ?? (string) ($sale->docSunatType?->value ?? $sale->docSunatType ?? '');
-
         if ($docType !== DocSunatType::NOTA_CREDITO->value) {
             $queryKey = $duplicate ? 'duplicate' : 'edit';
-
             $this->redirect(match ($docType) {
                 DocSunatType::BOLETA->value => route('create-boleta', [$queryKey => $saleId]),
                 DocSunatType::FACTURA->value => route('create-factura', [$queryKey => $saleId]),
                 default => route('vouchers'),
             }, navigate: true);
-
             return;
         }
-
         if (! $duplicate) {
             if ($sale->status === DocumentStatus::APPROVED) {
                 Flux::toast(
@@ -92,16 +90,13 @@ new class extends Component
                     variant: 'warning',
                     duration: 3000
                 );
-
                 $this->redirectRoute('vouchers', navigate: true);
-
                 return;
             }
 
             $this->editingSaleId = (string) $sale->id;
             $this->savedSaleId = (string) $sale->id;
         }
-
         $data = $sale->toArray();
 
         $this->sale->companyId = (string) ($data['companyId'] ?? $this->sale->companyId);
@@ -128,7 +123,6 @@ new class extends Component
         if ($clientId !== '' && is_array($client)) {
             $label = (string) ((string) ($client['name'] ?? '') ?: (string) ($client['tradeName'] ?? ''));
             $label = Str::limit($label, 12, '...') . ' - ' . (string) ($client['documentNumber'] ?? '');
-
             $this->selectedClientLabel = $label;
             $this->clients = [
                 ['value' => $clientId, 'label' => $label],
@@ -137,11 +131,9 @@ new class extends Component
             $this->selectedClientLabel = null;
             $this->clients = [];
         }
-
         if (filled($this->sale->affectedSaleDocumentId) && filled($this->sale->affectedSerie) && filled($this->sale->affectedCorrelative)) {
             $this->selectedAffectedLabel = $this->sale->affectedSerie . '-' . $this->sale->affectedCorrelative;
         }
-
         $saleService->applyTotals($this->sale, $this->items);
     }
 
@@ -152,7 +144,10 @@ new class extends Component
 
     public function searchClient(string $q = ''): void
     {
-        $this->clients = $this->client->searchWithoutDni($q);
+        $affectedDocSunatType = (string) ($this->sale->affectedDocSunatType ?? DocSunatType::BOLETA->value);
+        $this->clients = $affectedDocSunatType === DocSunatType::FACTURA->value
+            ? $this->client->searchWithoutDni($q)
+            : $this->client->search($q);
     }
 
     public function selectClient(?string $id = null, ?string $label = null): void
@@ -160,9 +155,7 @@ new class extends Component
         if (blank($id)) {
             return;
         }
-
         $this->sale->clientId = $id;
-
         if (filled($label)) {
             if (str_contains($label, ' - ')) {
                 [$name, $documentNumber] = explode(' - ', $label, 2);
@@ -171,7 +164,6 @@ new class extends Component
                 $label = Str::limit($label, 12, '...');
             }
         }
-
         $this->selectedClientLabel = $label;
     }
 
@@ -201,7 +193,7 @@ new class extends Component
         );
     }
 
-    public function selectAffectedDocument(?string $id = null, ?string $label = null, SaleService $saleService): void
+    public function selectAffectedDocument(SaleService $saleService, ?string $id = null, ?string $label = null): void
     {
         if (blank($id)) {
             return;
@@ -210,6 +202,17 @@ new class extends Component
         $sale = SaleDocument::query()
             ->with(['items.discounts', 'discounts', 'client', 'company'])
             ->findOrFail($id);
+        if ($sale->status !== DocumentStatus::APPROVED) {
+            Flux::toast(
+                heading: 'Alerta',
+                text: 'Solo puede afectar comprobantes aprobados',
+                variant: 'warning',
+                duration: 2500
+            );
+            $this->clearAffectedDocument();
+            return;
+        }
+
         $data = $sale->toArray();
         $this->sale->affectedDocSunatType = (string) ($data['docSunatType'] ?? '');
         $this->sale->affectedSerie = (string) ($data['serie'] ?? '');
@@ -248,11 +251,11 @@ new class extends Component
         $this->sale->affectedSaleDocumentId = null;
         $this->sale->affectedSerie = null;
         $this->sale->affectedCorrelative = null;
-
         $this->selectedAffectedLabel = null;
-
+        
         $this->sale->clientId = null;
         $this->selectedClientLabel = null;
+        $this->affectedDocuments = [];
         $this->clients = [];
 
         $this->items = [];
@@ -273,7 +276,7 @@ new class extends Component
         Flux::modal('sale-item')->show();
     }
 
-    public function deletedItem(int $index, SaleService $saleService): void
+    public function deletedItem(SaleService $saleService, int $index): void
     {
         unset($this->items[$index]);
         $this->items = array_values($this->items);
@@ -328,7 +331,7 @@ new class extends Component
     }
 
     #[On('sale-item-created')]
-    public function saleItemCreated(array $item, SaleService $saleService): void
+    public function saleItemCreated(SaleService $saleService, array $item): void
     {
         $this->items[] = $item;
         $saleService->applyTotals($this->sale, $this->items);
@@ -336,7 +339,7 @@ new class extends Component
     }
 
     #[On('sale-item-updated')]
-    public function saleItemUpdated(int $index, array $item, SaleService $saleService): void
+    public function saleItemUpdated(SaleService $saleService, int $index, array $item): void
     {
         if (! isset($this->items[$index])) {
             return;
@@ -548,8 +551,8 @@ new class extends Component
                         </div>
                     </div>
                 </div>
-                <div class="flex-1 space-y-2 overflow-auto p-4 scrollbar-thin-stable">
-                        <div class="grid grid-cols-[1fr_0.6fr] gap-3">                        
+                <div class="flex-1 space-y-2 overflow-auto pt-4 pl-4 pb-4 pr-2 scrollbar-thin-stable">
+                    <div class="grid grid-cols-[1fr_0.6fr] gap-3">                        
                         <x-form.select
                             label="Tipo doc. afect."
                             type="simple"
