@@ -75,6 +75,11 @@ class SunatService
     {
         $certPath = storage_path($company->cert_path);
         $see = new See();
+        $see->setBuilderOptions([
+            'template_paths' => [
+                resource_path('templates/xml'),
+            ],
+        ]);
         $see->setCertificate(file_get_contents($certPath));        
         $see->setService($company->production ? SunatEndpoints::FE_PRODUCCION : SunatEndpoints::FE_BETA);
         $see->setClaveSOL($company->ruc, $company->sol_user, $company->sol_pass);
