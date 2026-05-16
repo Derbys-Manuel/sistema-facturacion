@@ -484,39 +484,25 @@ class SaleForm extends Form
     {
         $affectedDocSunatType = (string) ($affectedDocSunatType ?: DocSunatType::BOLETA->value);
         $q = filled($q) ? trim((string) $q) : null;
-
         return SaleDocument::query()
             ->where('company_id', $companyId)
             ->where('doc_sunat_type', $affectedDocSunatType)
             ->where('status', DocumentStatus::APPROVED->value)
             ->when(
                 $q,
-                fn ($query) => $query->where(fn ($subQuery) => $subQuery
-                    ->whereRaw("(serie || '-' || correlative) ilike ?", ["%{$q}%"])
-                    ->orWhereHas('client', fn ($clientQuery) => $clientQuery->where(fn ($clientSubQuery) => $clientSubQuery
-                        ->where('trade_name', 'ilike', "%{$q}%")
-                        ->orWhere('name', 'ilike', "%{$q}%")
-                        ->orWhere('document_number', 'ilike', "%{$q}%")
-                    ))
-                )
+                fn ($query) => $query->whereRaw("(serie || '-' || correlative) ilike ?", ["%{$q}%"])
             )
-            ->with(['client'])
             ->latest('date_issue')
             ->limit(20)
             ->get()
             ->map(function (SaleDocument $sale) {
                 $data = $sale->toArray();
-                $client = $data['client'] ?? [];
-                $clientName = (string) (($client['name'] ?? '') ?: ($client['tradeName'] ?? ''));
-                $clientDoc = (string) ($client['documentNumber'] ?? '');
+
                 $number = (string) (($data['serie'] ?? '') . '-' . ($data['correlative'] ?? ''));
-                $label = $number;
-                if (filled($clientName) || filled($clientDoc)) {
-                    $label .= ' - ' . Str::limit(trim($clientName), 18, '...') . ' ' . $clientDoc;
-                }
+
                 return [
                     'value' => (string) ($data['id'] ?? ''),
-                    'label' => trim($label),
+                    'label' => $number,
                 ];
             })
             ->values()

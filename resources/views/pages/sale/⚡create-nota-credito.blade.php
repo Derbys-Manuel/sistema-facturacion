@@ -548,8 +548,8 @@ new class extends Component
                         </div>
                     </div>
                 </div>
-                <div class="flex-1 space-y-4 overflow-auto p-4 scrollbar-thin-stable">
-                    <div class="grid grid-cols-[0.8fr_1.2fr] gap-3">
+                <div class="flex-1 space-y-2 overflow-auto p-4 scrollbar-thin-stable">
+                        <div class="grid grid-cols-[1fr_0.6fr] gap-3">                        
                         <x-form.select
                             label="Tipo doc. afect."
                             type="simple"
@@ -559,9 +559,10 @@ new class extends Component
                             :error="$errors->first('sale.affectedDocSunatType')"
                         />
                         <x-form.select
+                            wire:key="affected-document-select-{{ $sale->affectedSaleDocumentId ?? 'empty' }}"
                             label="Documento afectado"
                             placeholder="Buscar comprobante..."
-                            search-placeholder="Escribe serie-correlativo o cliente..."
+                            search-placeholder="Escribe serie-correlativo"
                             icon-left="magnifying-glass"
                             :clearable="true"
                             :options="$affectedDocuments"
