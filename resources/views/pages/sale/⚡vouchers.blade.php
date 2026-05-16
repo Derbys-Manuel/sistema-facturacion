@@ -344,178 +344,191 @@ new class extends Component
                 </flux:field>
             </div>
         </div>
-        <x-ui.table :columns="['Fecha', 'Documento', 'Cliente', 'Tipo', 'Total', 'Estado', 'Acciones']" striped>
-            @forelse ($documents['data'] as $row)
-                <tr class="transition-colors hover:bg-zinc-50 font-mono text-xs" wire:key="sale-document-{{ $row['id'] }}">
-                    <x-ui.table.cell>
-                        {{ $row['dateIssue'] ? Carbon::parse($row['dateIssue'])->format('d-m-Y H:i') : '-' }}
-                    </x-ui.table.cell>
-                    <x-ui.table.cell>
-                        {{ ($row['serie'] ?? '-') . '-' . ($row['correlative'] ?? '-') }}
-                        {{ $row['affectedSaleDocumentId'] ? 
-                        ( '('.$row['affectedSerie'] .'-'. $row['affectedCorrelative'].')') : ''  }}
-                    </x-ui.table.cell>
-                    <x-ui.table.cell class="max-w-[28ch] truncate">
-                        @php($clientName = data_get($row, 'client.tradeName') ?: data_get($row, 'client.name'))
-                        @php($clientDoc = data_get($row, 'client.documentNumber'))
-                        <div class="truncate font-medium text-zinc-800">
-                            {{ $clientName ?: '' }}
-                        </div>
-                        <div class="mt-0.5 truncate text-xs text-zinc-500 font-mono">
-                            {{ $clientDoc ?: '' }}
-                        </div>
-                    </x-ui.table.cell>
-                    <x-ui.table.cell>
-                        {{ $this->docSunatTypeLabel($row['docSunatType'] ?? null) }}
-                    </x-ui.table.cell>
-                    <x-ui.table.cell class="tabular-nums font-semibold">
-                        S/ {{ number_format((float) ($row['total'] ?? 0), 2) }}
-                    </x-ui.table.cell>
-                    <x-ui.table.cell>
-                        <flux:tooltip toggleable>
-                            <button type="button" class="inline-flex cursor-pointer">
-                                <flux:badge :color="$this->statusBadgeColor($row['status'] ?? null)">
-                                    {{ $row['status'] ?? '-' }}
-                                </flux:badge>
-                            </button>
-                            <flux:tooltip.content class="max-w-[22rem] space-y-2 text-xs">
-                                @php($cdr = data_get($row, 'cdr'))
-                                @if (is_array($cdr) && data_get($cdr, 'success') === true)
-                                    <p class="font-semibold text-white">SUNAT: Aceptado</p>
-                                    <p class="text-white">
-                                        Código: {{ data_get($cdr, 'cdrResponse.code', '-') }}
-                                    </p>
-                                    @php($notes = data_get($cdr, 'cdrResponse.notes'))
-                                    @if (is_array($notes) && count($notes))
-                                        <p class="text-white font-semibold">Notas:</p>
-                                        <ul class="list-disc pl-4 text-white">
-                                            @foreach ($notes as $note)
-                                                <li>{{ $note }}</li>
-                                            @endforeach
-                                        </ul>
+        <div class="relative">
+            <div
+                wire:loading.flex
+                wire:target="from,to,q,docSunatType,deletedBool,companyId,nextPage,previousPage,setCompany,resetFilters"
+                class="absolute inset-0 z-10 hidden items-center justify-center bg-white/60 backdrop-blur-[1px]"
+            >
+                <div class="flex items-center gap-2 rounded-md bg-white px-4 py-3 shadow">
+                    <flux:icon.loading class="size-4 animate-spin text-emerald-600" />
+                    <span class="text-sm font-medium text-zinc-600">Cargando datos...</span>
+                </div>
+            </div>
+             <x-ui.table :columns="['Fecha', 'Documento', 'Cliente', 'Tipo', 'Total', 'Estado', 'Acciones']" striped>
+                @forelse ($documents['data'] as $row)
+                    <tr class="transition-colors hover:bg-zinc-50 font-mono text-xs" wire:key="sale-document-{{ $row['id'] }}">
+                        <x-ui.table.cell>
+                            {{ $row['dateIssue'] ? Carbon::parse($row['dateIssue'])->format('d-m-Y H:i') : '-' }}
+                        </x-ui.table.cell>
+                        <x-ui.table.cell>
+                            {{ ($row['serie'] ?? '-') . '-' . ($row['correlative'] ?? '-') }}
+                            {{ $row['affectedSaleDocumentId'] ? 
+                            ( '('.$row['affectedSerie'] .'-'. $row['affectedCorrelative'].')') : ''  }}
+                        </x-ui.table.cell>
+                        <x-ui.table.cell class="max-w-[28ch] truncate">
+                            @php($clientName = data_get($row, 'client.tradeName') ?: data_get($row, 'client.name'))
+                            @php($clientDoc = data_get($row, 'client.documentNumber'))
+                            <div class="truncate font-medium text-zinc-800">
+                                {{ $clientName ?: '' }}
+                            </div>
+                            <div class="mt-0.5 truncate text-xs text-zinc-500 font-mono">
+                                {{ $clientDoc ?: '' }}
+                            </div>
+                        </x-ui.table.cell>
+                        <x-ui.table.cell>
+                            {{ $this->docSunatTypeLabel($row['docSunatType'] ?? null) }}
+                        </x-ui.table.cell>
+                        <x-ui.table.cell class="tabular-nums font-semibold">
+                            S/ {{ number_format((float) ($row['total'] ?? 0), 2) }}
+                        </x-ui.table.cell>
+                        <x-ui.table.cell>
+                            <flux:tooltip toggleable>
+                                <button type="button" class="inline-flex cursor-pointer">
+                                    <flux:badge :color="$this->statusBadgeColor($row['status'] ?? null)">
+                                        {{ $row['status'] ?? '-' }}
+                                    </flux:badge>
+                                </button>
+                                <flux:tooltip.content class="max-w-[22rem] space-y-2 text-xs">
+                                    @php($cdr = data_get($row, 'cdr'))
+                                    @if (is_array($cdr) && data_get($cdr, 'success') === true)
+                                        <p class="font-semibold text-white">SUNAT: Aceptado</p>
+                                        <p class="text-white">
+                                            Código: {{ data_get($cdr, 'cdrResponse.code', '-') }}
+                                        </p>
+                                        @php($notes = data_get($cdr, 'cdrResponse.notes'))
+                                        @if (is_array($notes) && count($notes))
+                                            <p class="text-white font-semibold">Notas:</p>
+                                            <ul class="list-disc pl-4 text-white">
+                                                @foreach ($notes as $note)
+                                                    <li>{{ $note }}</li>
+                                                @endforeach
+                                            </ul>
+                                        @else
+                                            <p class="text-white">Notas: -</p>
+                                        @endif
+                                        <p class="text-white">
+                                            {{ data_get($cdr, 'cdrResponse.description', '-') }}
+                                        </p>
+                                    @elseif (is_array($cdr) && data_get($cdr, 'success') === false)
+                                        <p class="font-semibold text-white">SUNAT: Rechazado (Editar unicamente cuando el codigo del error esta en este rango 0100-1999)</p>
+                                        <p class="text-white">
+                                            Código: {{ data_get($cdr, 'error.code', '-') }}
+                                        </p>
+                                        @php($notes = data_get($cdr, 'cdrResponse.notes'))
+                                        @if (is_array($notes) && count($notes))
+                                            <p class="text-white font-semibold">Notas:</p>
+                                            <ul class="list-disc pl-4 text-white">
+                                                @foreach ($notes as $note)
+                                                    <li>{{ $note }}</li>
+                                                @endforeach
+                                            </ul>
+                                        @else
+                                            <p class="text-white">Notas: -</p>
+                                        @endif
+                                        <p class="text-white">
+                                            {{ data_get($cdr, 'error.message', '-') }}
+                                        </p>
                                     @else
-                                        <p class="text-white">Notas: -</p>
+                                        <p class="text-white">Sin respuesta de SUNAT.</p>
                                     @endif
-                                    <p class="text-white">
-                                        {{ data_get($cdr, 'cdrResponse.description', '-') }}
-                                    </p>
-                                @elseif (is_array($cdr) && data_get($cdr, 'success') === false)
-                                    <p class="font-semibold text-white">SUNAT: Rechazado (Editar unicamente cuando el codigo del error esta en este rango 0100-1999)</p>
-                                    <p class="text-white">
-                                        Código: {{ data_get($cdr, 'error.code', '-') }}
-                                    </p>
-                                    @php($notes = data_get($cdr, 'cdrResponse.notes'))
-                                    @if (is_array($notes) && count($notes))
-                                        <p class="text-white font-semibold">Notas:</p>
-                                        <ul class="list-disc pl-4 text-white">
-                                            @foreach ($notes as $note)
-                                                <li>{{ $note }}</li>
-                                            @endforeach
-                                        </ul>
-                                    @else
-                                        <p class="text-white">Notas: -</p>
-                                    @endif
-                                    <p class="text-white">
-                                        {{ data_get($cdr, 'error.message', '-') }}
-                                    </p>
-                                @else
-                                    <p class="text-white">Sin respuesta de SUNAT.</p>
-                                @endif
-                            </flux:tooltip.content>
-                        </flux:tooltip>
-                    </x-ui.table.cell>
-                    <x-ui.table.cell class="flex justify-center" >
-                        <flux:dropdown>
-                            <flux:button
-                                icon:trailing="ellipsis-horizontal"
-                                size="sm"
-                                wire:loading.attr="disabled"
-                                wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
-                            />                            
-                            <flux:menu>
-                                <flux:menu.item
-                                    icon="document-duplicate"
-                                    wire:click="duplicateSale('{{ $row['id'] }}', '{{ $row['docSunatType'] ?? '' }}')"
+                                </flux:tooltip.content>
+                            </flux:tooltip>
+                        </x-ui.table.cell>
+                        <x-ui.table.cell class="flex justify-center" >
+                            <flux:dropdown>
+                                <flux:button
+                                    icon:trailing="ellipsis-horizontal"
+                                    size="sm"
                                     wire:loading.attr="disabled"
-                                    wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"    
-                                >
-                                    Duplicar
-                                </flux:menu.item>
-                                    @if (
-                                        ($row['status'] ?? null) === DocumentStatus::APPROVED->value
-                                        && in_array($row['docSunatType'] ?? null, [DocSunatType::BOLETA->value, DocSunatType::FACTURA->value], true)
-                                    )
+                                    wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                />                            
+                                <flux:menu>
+                                    <flux:menu.item
+                                        icon="document-duplicate"
+                                        wire:click="duplicateSale('{{ $row['id'] }}', '{{ $row['docSunatType'] ?? '' }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"    
+                                    >
+                                        Duplicar
+                                    </flux:menu.item>
+                                        @if (
+                                            ($row['status'] ?? null) === DocumentStatus::APPROVED->value
+                                            && in_array($row['docSunatType'] ?? null, [DocSunatType::BOLETA->value, DocSunatType::FACTURA->value], true)
+                                        )
+                                            <flux:menu.item
+                                                icon="document-text"
+                                                wire:click="createCreditNote('{{ $row['id'] }}')"
+                                                wire:loading.attr="disabled"
+                                                wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                            >
+                                                Nota de crédito
+                                            </flux:menu.item>
+                                        @endif
+                                        @if (in_array($row['status'] ?? null, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value], true))
                                         <flux:menu.item
-                                            icon="document-text"
-                                            wire:click="createCreditNote('{{ $row['id'] }}')"
+                                            icon="pencil"
+                                            wire:click="editSale('{{ $row['id'] }}', '{{ $row['docSunatType'] ?? '' }}')"
                                             wire:loading.attr="disabled"
                                             wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
                                         >
-                                            Nota de crédito
+                                            Editar
                                         </flux:menu.item>
                                     @endif
-                                    @if (in_array($row['status'] ?? null, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value], true))
-                                    <flux:menu.item
-                                        icon="pencil"
-                                        wire:click="editSale('{{ $row['id'] }}', '{{ $row['docSunatType'] ?? '' }}')"
+                                    @if ($row['status'] === DocumentStatus::DRAFT->value)
+                                        <flux:menu.item icon="paper-airplane"
+                                        wire:click="confirmSend('{{ $row['id'] }}')"
                                         wire:loading.attr="disabled"
                                         wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                        >
+                                            Enviar a sunat
+                                        </flux:menu.item>
+                                    @endif
+                                    <flux:menu.item icon="document-magnifying-glass"
+                                    wire:click="previewPdf('{{ $row['id'] }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
                                     >
-                                        Editar
+                                        Abrir pdf
                                     </flux:menu.item>
-                                @endif
-                                 @if ($row['status'] === DocumentStatus::DRAFT->value)
-                                     <flux:menu.item icon="paper-airplane"
-                                     wire:click="confirmSend('{{ $row['id'] }}')"
-                                     wire:loading.attr="disabled"
-                                     wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
-                                     >
-                                         Enviar a sunat
-                                     </flux:menu.item>
-                                 @endif
-                                 <flux:menu.item icon="document-magnifying-glass"
-                                 wire:click="previewPdf('{{ $row['id'] }}')"
-                                 wire:loading.attr="disabled"
-                                 wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
-                                 >
-                                     Abrir pdf
-                                 </flux:menu.item>
-                                @if(
-                                    (
-                                        $row['sunatState'] === null ||
-                                        $row['sunatState'] === true
+                                    @if(
+                                        (
+                                            $row['sunatState'] === null ||
+                                            $row['sunatState'] === true
+                                        )
+                                        && data_get($cdr, 'success') === false ||
+                                        $row['status'] === DocumentStatus::DRAFT->value
                                     )
-                                    && data_get($cdr, 'success') === false ||
-                                    $row['status'] === DocumentStatus::DRAFT->value
-                                )
-                                     <flux:menu.item icon="trash" 
-                                     wire:click="delete('{{ $row['id'] }}')"
-                                     wire:loading.attr="disabled"
-                                     wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
-                                     >
-                                         Eliminar
-                                     </flux:menu.item>
-                                 @endif
-                                 @if($row['sunatState'] === false)
-                                     <flux:menu.item icon="arrow-path" 
-                                     wire:click="restore('{{ $row['id'] }}')"
-                                     wire:loading.attr="disabled"
-                                     wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote">
-                                         Restaurar
-                                     </flux:menu.item>
-                                 @endif
-                            </flux:menu>
-                        </flux:dropdown>
-                    </x-ui.table.cell>
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="7" class="px-4 py-8 text-center text-sm text-zinc-500">
-                        Sin resultados.
-                    </td>
-                </tr>
-            @endforelse
-        </x-ui.table>
+                                        <flux:menu.item icon="trash" 
+                                        wire:click="delete('{{ $row['id'] }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                        >
+                                            Eliminar
+                                        </flux:menu.item>
+                                    @endif
+                                    @if($row['sunatState'] === false)
+                                        <flux:menu.item icon="arrow-path" 
+                                        wire:click="restore('{{ $row['id'] }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote">
+                                            Restaurar
+                                        </flux:menu.item>
+                                    @endif
+                                </flux:menu>
+                            </flux:dropdown>
+                        </x-ui.table.cell>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7" class="px-4 py-8 text-center text-sm text-zinc-500">
+                            Sin resultados.
+                        </td>
+                    </tr>
+                @endforelse
+            </x-ui.table>
+        </div>
+       
         <div class="flex flex-col gap-0 sm:flex-row sm:items-center sm:justify-between">
             <div class="text-xs text-zinc-500">
                 Página {{ $documents['current_page'] ?? 1 }} de {{ $documents['last_page'] ?? 1 }} ·
