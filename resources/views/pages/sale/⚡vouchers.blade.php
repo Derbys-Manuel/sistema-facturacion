@@ -363,6 +363,8 @@ new class extends Component
                     </x-ui.table.cell>
                     <x-ui.table.cell>
                         {{ ($row['serie'] ?? '-') . '-' . ($row['correlative'] ?? '-') }}
+                        {{ $row['affectedSaleDocumentId'] ? 
+                        ( '('.$row['affectedSerie'] .'-'. $row['affectedCorrelative'].')') : ''  }}
                     </x-ui.table.cell>
                     <x-ui.table.cell class="max-w-[28ch] truncate">
                         @php($clientName = data_get($row, 'client.tradeName') ?: data_get($row, 'client.name'))
