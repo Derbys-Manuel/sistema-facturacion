@@ -4,6 +4,7 @@ namespace App\Livewire\Forms;
 
 use App\Enums\DocumentStatus;
 use App\Enums\Sunat\DocSunatType;
+use Illuminate\Support\Str;
 use App\Models\SaleDocument;
 use App\Services\SerieService;
 use App\Services\SaleService;
@@ -28,6 +29,24 @@ class SaleForm extends Form
 
     #[Validate('required')]
     public $docSunatType = '';
+
+    #[Validate('nullable|string|required_if:docSunatType,07,08')]
+    public ?string $affectedSaleDocumentId = null;
+
+    #[Validate('nullable|string|max:2|required_if:docSunatType,07,08')]
+    public ?string $affectedDocSunatType = null;
+
+    #[Validate('nullable|string|max:4|required_if:docSunatType,07,08')]
+    public ?string $affectedSerie = null;
+
+    #[Validate('nullable|string|max:10|required_if:docSunatType,07,08')]
+    public ?string $affectedCorrelative = null;
+
+    #[Validate('nullable|string|max:2|required_if:docSunatType,07')]
+    public ?string $noteReasonCode = null;
+
+    #[Validate('nullable|string|max:255|required_if:docSunatType,07')]
+    public ?string $noteReasonDescription = null;
 
     #[Validate('required')]
     public $operationType = OperationType::INTERNAL_SALE->value;
@@ -138,6 +157,12 @@ class SaleForm extends Form
             'dateExpiration' => 'fecha de vencimiento',
             'items' => 'productos',
             'discounts' => 'descuentos',
+            'affectedSaleDocumentId' => 'documento afectado',
+            'affectedDocSunatType' => 'tipo de documento afectado',
+            'affectedSerie' => 'serie afectada',
+            'affectedCorrelative' => 'correlativo afectado',
+            'noteReasonCode' => 'código de motivo',
+            'noteReasonDescription' => 'descripción del motivo',
         ];
     }
     public function store(
@@ -153,9 +178,16 @@ class SaleForm extends Form
             $serieService,
             $discountForm,
         ) {
+            $affectedDocSunatType = in_array(
+                (string) ($data['docSunatType'] ?? ''),
+                [DocSunatType::NOTA_CREDITO->value, DocSunatType::NOTA_DEBITO->value],
+                true,
+            ) ? (string) ($data['affectedDocSunatType'] ?? '') : null;
+
             $serie = $serieService->getSerieForUpdate(
                 $data['docSunatType'],
-                $data['companyId']
+                $data['companyId'],
+                filled($affectedDocSunatType) ? $affectedDocSunatType : null,
             );
             $nextCorrelative = $serieService->nextCorrelative((string) $serie->correlative);
             $serie->update([
@@ -170,6 +202,12 @@ class SaleForm extends Form
                 'currency' => $data['currency'],
                 'serie' => $serie->code,
                 'correlative' => $nextCorrelative,
+                'affected_sale_document_id' => $data['affectedSaleDocumentId'],
+                'affected_doc_sunat_type' => $data['affectedDocSunatType'],
+                'affected_serie' => $data['affectedSerie'],
+                'affected_correlative' => $data['affectedCorrelative'],
+                'note_reason_code' => $data['noteReasonCode'],
+                'note_reason_description' => $data['noteReasonDescription'],
                 'credit_days' => $data['creditDays'],
                 'num_quota' => $data['numQuota'],
                 'total_taxed' => $data['totalTaxed'],
@@ -236,16 +274,13 @@ class SaleForm extends Form
         DiscountForm $discountForm,
     ): array {
         $data = $this->validate();
-
         $sale = DB::transaction(function () use ($saleId, $data, $itemForm, $discountForm) {
             $sale = SaleDocument::query()
                 ->with(['items.discounts', 'discounts'])
                 ->findOrFail($saleId);
-
             if ($sale->status === DocumentStatus::APPROVED) {
                 throw new \RuntimeException('No se puede editar un comprobante aprobado.');
             }
-
             $sale->update([
                 'document_type' => $data['documentType'],
                 'ubl_version' => $data['ublVersion'],
@@ -253,6 +288,12 @@ class SaleForm extends Form
                 'operation_type' => $data['operationType'],
                 'payment_form' => $data['paymentForm'],
                 'currency' => $data['currency'],
+                'affected_sale_document_id' => $data['affectedSaleDocumentId'],
+                'affected_doc_sunat_type' => $data['affectedDocSunatType'],
+                'affected_serie' => $data['affectedSerie'],
+                'affected_correlative' => $data['affectedCorrelative'],
+                'note_reason_code' => $data['noteReasonCode'],
+                'note_reason_description' => $data['noteReasonDescription'],
                 'credit_days' => $data['creditDays'],
                 'num_quota' => $data['numQuota'],
                 'total_taxed' => $data['totalTaxed'],
@@ -282,15 +323,11 @@ class SaleForm extends Form
                 'status' => DocumentStatus::DRAFT->value,
                 'sunat_state' => true,
             ]);
-
             $sale->discounts()->delete();
-
             foreach ($sale->items as $item) {
                 $item->discounts()->delete();
             }
-
             $sale->items()->delete();
-
             $saleDiscounts = $data['discounts'] ?? [];
             if (
                 is_array($saleDiscounts)
@@ -302,9 +339,7 @@ class SaleForm extends Form
                     saleDocumentItemId: null
                 );
             }
-
             $itemForm->store($data['items'], (string) $sale->id, $discountForm);
-
             return $sale->load('company', 'client');
         });
 
@@ -339,7 +374,6 @@ class SaleForm extends Form
         ?string $to = null,
         ?string $q = null,
         ?string $docSunatType = null,
-        ?string $operationType = null,
         ?string $companyId = null,
     ): array {
         return $this->documentsQuery(
@@ -348,7 +382,6 @@ class SaleForm extends Form
             to: $to,
             q: $q,
             docSunatType: $docSunatType,
-            operationType: $operationType,
             companyId: $companyId,
         )
             ->with(['items', 'client', 'company'])
@@ -362,7 +395,6 @@ class SaleForm extends Form
         ?string $to = null,
         ?string $q = null,
         ?string $docSunatType = null,
-        ?string $operationType = null,
         ?string $companyId = null,
     ): array {
         $query = $this->documentsQuery(
@@ -371,10 +403,12 @@ class SaleForm extends Form
             to: $to,
             q: $q,
             docSunatType: $docSunatType,
-            operationType: $operationType,
             companyId: $companyId,
         );
-        $total = (float) (clone $query)->sum('total');
+        $creditNoteType = DocSunatType::NOTA_CREDITO->value;
+        $total = (float) (clone $query)
+            ->selectRaw('coalesce(sum(case when doc_sunat_type = ? then -total else total end),0) as signed_total', [$creditNoteType])
+            ->value('signed_total');
         $boletas = (float) (clone $query)
             ->where('doc_sunat_type', DocSunatType::BOLETA->value)
             ->sum('total');
@@ -382,15 +416,16 @@ class SaleForm extends Form
             ->where('doc_sunat_type', DocSunatType::FACTURA->value)
             ->sum('total');
         $totalIgv = (float) (clone $query)
-            ->sum('total_igv');
+            ->selectRaw('coalesce(sum(case when doc_sunat_type = ? then -total_igv else total_igv end),0) as signed_total_igv', [$creditNoteType])
+            ->value('signed_total_igv');
         $saleValue = (float) (clone $query)
-            ->sum('sale_value');
-        
+            ->selectRaw('coalesce(sum(case when doc_sunat_type = ? then -sale_value else sale_value end),0) as signed_sale_value', [$creditNoteType])
+            ->value('signed_sale_value');
         return [
             'boletas' => $boletas,
             'facturas' => $facturas,
-            'totalIgv' =>$totalIgv,
-            'saleValue' =>$saleValue,
+            'totalIgv' => $totalIgv,
+            'saleValue' => $saleValue,
             'total' => $total,
         ];
     }
@@ -401,7 +436,6 @@ class SaleForm extends Form
         ?string $to = null,
         ?string $q = null,
         ?string $docSunatType = null,
-        ?string $operationType = null,
         ?string $companyId = null,
     ): Builder {
         $q = filled($q) ? trim((string) $q) : null;
@@ -419,7 +453,6 @@ class SaleForm extends Form
             ->when($from, fn ($query) => $query->whereDate('date_issue', '>=', $from))
             ->when($to, fn ($query) => $query->whereDate('date_issue', '<=', $to))
             ->when($docSunatType, fn ($query) => $query->where('doc_sunat_type', $docSunatType))
-            ->when($operationType, fn ($query) => $query->where('operation_type', $operationType))
             ->when(
                 $q,
                 fn ($query) => $query->where(
@@ -444,6 +477,34 @@ class SaleForm extends Form
                         )
                 )
             );
+    }
+    public function searchAffectedDocuments(string $companyId, ?string $affectedDocSunatType = null, string $q = ''): array
+    {
+        $affectedDocSunatType = (string) ($affectedDocSunatType ?: DocSunatType::BOLETA->value);
+        $q = filled($q) ? trim((string) $q) : null;
+        return SaleDocument::query()
+            ->where('company_id', $companyId)
+            ->where('doc_sunat_type', $affectedDocSunatType)
+            ->where('status', DocumentStatus::APPROVED->value)
+            ->when(
+                $q,
+                fn ($query) => $query->whereRaw("(serie || '-' || correlative) ilike ?", ["%{$q}%"])
+            )
+            ->latest('date_issue')
+            ->limit(20)
+            ->get()
+            ->map(function (SaleDocument $sale) {
+                $data = $sale->toArray();
+
+                $number = (string) (($data['serie'] ?? '') . '-' . ($data['correlative'] ?? ''));
+
+                return [
+                    'value' => (string) ($data['id'] ?? ''),
+                    'label' => $number,
+                ];
+            })
+            ->values()
+            ->toArray();
     }
 
 }    

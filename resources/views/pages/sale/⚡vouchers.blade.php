@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\Sunat\DocSunatType;
-use App\Enums\Sunat\OperationType;
 use App\Enums\DocumentStatus;
 use App\Livewire\Forms\SaleForm;
 use Illuminate\Support\Carbon;
@@ -20,7 +19,6 @@ new class extends Component
     public ?string $to = null;
     public ?string $q = null;
     public ?string $docSunatType = null;
-    public ?string $operationType = null;
     public ?string $companyId = null;
     public bool $companyReady = false;
 
@@ -52,7 +50,6 @@ new class extends Component
         $this->to = null;
         $this->q = null;
         $this->docSunatType = null;
-        $this->operationType = null;
 
         $this->resetPage();
     }
@@ -69,7 +66,6 @@ new class extends Component
     public function updatedTo(): void { $this->resetPage(); }
     public function updatedQ(): void { $this->resetPage(); }
     public function updatedDocSunatType(): void { $this->resetPage(); }
-    public function updatedOperationType(): void { $this->resetPage(); }
 
     public function getSummaryProperty(): array
     {
@@ -88,7 +84,6 @@ new class extends Component
             to: $this->to,
             q: $this->q,
             docSunatType: $this->docSunatType,
-            operationType: $this->operationType,
             companyId: $this->companyId,
         );
     }
@@ -116,7 +111,6 @@ new class extends Component
             to: $this->to,
             q: $this->q,
             docSunatType: $this->docSunatType,
-            operationType: $this->operationType,
             companyId: $this->companyId,
         );
     }
@@ -127,14 +121,7 @@ new class extends Component
             ['value' => null, 'label' => 'Todos'],
             ['value' => DocSunatType::BOLETA->value, 'label' => 'Boleta'],
             ['value' => DocSunatType::FACTURA->value, 'label' => 'Factura'],
-        ];
-    }
-
-    public function getOperationTypeOptionsProperty(): array
-    {
-        return [
-            ['value' => null, 'label' => 'Todos'],
-            ['value' => OperationType::INTERNAL_SALE->value, 'label' => 'Venta interna'],
+            ['value' => DocSunatType::NOTA_CREDITO->value, 'label' => 'Nota de crédito'],
         ];
     }
 
@@ -143,6 +130,7 @@ new class extends Component
         return match ($value) {
             DocSunatType::BOLETA->value => 'Boleta',
             DocSunatType::FACTURA->value => 'Factura',
+            DocSunatType::NOTA_CREDITO->value => 'Nota de crédito',
             default => $value ?: '-',
         };
     }
@@ -217,6 +205,50 @@ new class extends Component
         $this->redirect(route($route, ['edit' => $saleId]), navigate: true);
     }
 
+    public function createCreditNote(?string $saleId = null): void
+    {
+        if (blank($saleId)) {
+            Flux::toast(
+                heading: 'Alerta',
+                text: 'No se encontró el comprobante',
+                variant: 'warning',
+                duration: 2500
+            );
+
+            return;
+        }
+
+        $sale = SaleDocument::query()
+            ->select(['id', 'status', 'doc_sunat_type'])
+            ->findOrFail($saleId);
+
+        $docSunatType = $sale->doc_sunat_type?->value ?? (string) $sale->doc_sunat_type;
+
+        if ($sale->status !== DocumentStatus::APPROVED) {
+            Flux::toast(
+                heading: 'Alerta',
+                text: 'Solo puede generar nota de crédito desde comprobantes aprobados',
+                variant: 'warning',
+                duration: 2500
+            );
+
+            return;
+        }
+
+        if (! in_array($docSunatType, [DocSunatType::BOLETA->value, DocSunatType::FACTURA->value], true)) {
+            Flux::toast(
+                heading: 'Alerta',
+                text: 'Tipo de comprobante no válido para nota de crédito',
+                variant: 'warning',
+                duration: 2500
+            );
+
+            return;
+        }
+
+        $this->redirect(route('create-nota-credito', ['affected' => $saleId]), navigate: true);
+    }
+
     public function delete(string $id){
         SaleDocument::where('id', $id)->update([
             'sunat_state'=> false
@@ -249,7 +281,7 @@ new class extends Component
 <div class="relative">
     <div
         wire:loading.flex
-        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore"
+        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
         class="fixed inset-0 z-[99999] hidden items-center justify-center bg-white/60 backdrop-blur-[1px]"
     >
         <div class="flex items-center gap-2 rounded-md bg-white px-4 py-3 shadow">
@@ -288,7 +320,6 @@ new class extends Component
         <div class="grid grid-cols-[0.6fr_auto] items-start gap-3 mb-2">
             <x-sale.filters
                 :doc-sunat-type-options="$this->docSunatTypeOptions"
-                :operation-type-options="$this->operationTypeOptions"
                 reset-action="resetFilters"
             />
             <div class="relative mt-2">
@@ -319,6 +350,8 @@ new class extends Component
                     </x-ui.table.cell>
                     <x-ui.table.cell>
                         {{ ($row['serie'] ?? '-') . '-' . ($row['correlative'] ?? '-') }}
+                        {{ $row['affectedSaleDocumentId'] ? 
+                        ( '('.$row['affectedSerie'] .'-'. $row['affectedCorrelative'].')') : ''  }}
                     </x-ui.table.cell>
                     <x-ui.table.cell class="max-w-[28ch] truncate">
                         @php($clientName = data_get($row, 'client.tradeName') ?: data_get($row, 'client.name'))
@@ -350,6 +383,17 @@ new class extends Component
                                     <p class="text-white">
                                         Código: {{ data_get($cdr, 'cdrResponse.code', '-') }}
                                     </p>
+                                    @php($notes = data_get($cdr, 'cdrResponse.notes'))
+                                    @if (is_array($notes) && count($notes))
+                                        <p class="text-white font-semibold">Notas:</p>
+                                        <ul class="list-disc pl-4 text-white">
+                                            @foreach ($notes as $note)
+                                                <li>{{ $note }}</li>
+                                            @endforeach
+                                        </ul>
+                                    @else
+                                        <p class="text-white">Notas: -</p>
+                                    @endif
                                     <p class="text-white">
                                         {{ data_get($cdr, 'cdrResponse.description', '-') }}
                                     </p>
@@ -358,6 +402,17 @@ new class extends Component
                                     <p class="text-white">
                                         Código: {{ data_get($cdr, 'error.code', '-') }}
                                     </p>
+                                    @php($notes = data_get($cdr, 'cdrResponse.notes'))
+                                    @if (is_array($notes) && count($notes))
+                                        <p class="text-white font-semibold">Notas:</p>
+                                        <ul class="list-disc pl-4 text-white">
+                                            @foreach ($notes as $note)
+                                                <li>{{ $note }}</li>
+                                            @endforeach
+                                        </ul>
+                                    @else
+                                        <p class="text-white">Notas: -</p>
+                                    @endif
                                     <p class="text-white">
                                         {{ data_get($cdr, 'error.message', '-') }}
                                     </p>
@@ -373,42 +428,56 @@ new class extends Component
                                 icon:trailing="ellipsis-horizontal"
                                 size="sm"
                                 wire:loading.attr="disabled"
-                                wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore"
+                                wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
                             />                            
                             <flux:menu>
                                 <flux:menu.item
                                     icon="document-duplicate"
                                     wire:click="duplicateSale('{{ $row['id'] }}', '{{ $row['docSunatType'] ?? '' }}')"
                                     wire:loading.attr="disabled"
-                                    wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore"    
+                                    wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"    
                                 >
                                     Duplicar
                                 </flux:menu.item>
-                                    @if (in_array($row['status'] ?? null, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value], true))                                    <flux:menu.item
+                                    @if (
+                                        ($row['status'] ?? null) === DocumentStatus::APPROVED->value
+                                        && in_array($row['docSunatType'] ?? null, [DocSunatType::BOLETA->value, DocSunatType::FACTURA->value], true)
+                                    )
+                                        <flux:menu.item
+                                            icon="document-text"
+                                            wire:click="createCreditNote('{{ $row['id'] }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                        >
+                                            Nota de crédito
+                                        </flux:menu.item>
+                                    @endif
+                                    @if (in_array($row['status'] ?? null, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value], true))
+                                    <flux:menu.item
                                         icon="pencil"
                                         wire:click="editSale('{{ $row['id'] }}', '{{ $row['docSunatType'] ?? '' }}')"
                                         wire:loading.attr="disabled"
-                                        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore"
+                                        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
                                     >
                                         Editar
                                     </flux:menu.item>
                                 @endif
-                                @if ($row['status'] === DocumentStatus::DRAFT->value)
-                                    <flux:menu.item icon="paper-airplane"
-                                    wire:click="confirmSend('{{ $row['id'] }}')"
-                                    wire:loading.attr="disabled"
-                                    wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore"
-                                    >
-                                        Enviar a sunat
-                                    </flux:menu.item>
-                                @endif
-                                <flux:menu.item icon="document-magnifying-glass"
-                                wire:click="previewPdf('{{ $row['id'] }}')"
-                                wire:loading.attr="disabled"
-                                wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore"
-                                >
-                                    Abrir pdf
-                                </flux:menu.item>
+                                 @if ($row['status'] === DocumentStatus::DRAFT->value)
+                                     <flux:menu.item icon="paper-airplane"
+                                     wire:click="confirmSend('{{ $row['id'] }}')"
+                                     wire:loading.attr="disabled"
+                                     wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                     >
+                                         Enviar a sunat
+                                     </flux:menu.item>
+                                 @endif
+                                 <flux:menu.item icon="document-magnifying-glass"
+                                 wire:click="previewPdf('{{ $row['id'] }}')"
+                                 wire:loading.attr="disabled"
+                                 wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                 >
+                                     Abrir pdf
+                                 </flux:menu.item>
                                 @if(
                                     (
                                         $row['sunatState'] === null ||
@@ -417,22 +486,22 @@ new class extends Component
                                     && data_get($cdr, 'success') === false ||
                                     $row['status'] === DocumentStatus::DRAFT->value
                                 )
-                                    <flux:menu.item icon="trash" 
-                                    wire:click="delete('{{ $row['id'] }}')"
-                                    wire:loading.attr="disabled"
-                                    wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore"
-                                    >
-                                        Eliminar
-                                    </flux:menu.item>
-                                @endif
-                                @if($row['sunatState'] === false)
-                                    <flux:menu.item icon="arrow-path" 
-                                    wire:click="restore('{{ $row['id'] }}')"
-                                    wire:loading.attr="disabled"
-                                    wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore">
-                                        Restaurar
-                                    </flux:menu.item>
-                                @endif
+                                     <flux:menu.item icon="trash" 
+                                     wire:click="delete('{{ $row['id'] }}')"
+                                     wire:loading.attr="disabled"
+                                     wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                     >
+                                         Eliminar
+                                     </flux:menu.item>
+                                 @endif
+                                 @if($row['sunatState'] === false)
+                                     <flux:menu.item icon="arrow-path" 
+                                     wire:click="restore('{{ $row['id'] }}')"
+                                     wire:loading.attr="disabled"
+                                     wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote">
+                                         Restaurar
+                                     </flux:menu.item>
+                                 @endif
                             </flux:menu>
                         </flux:dropdown>
                     </x-ui.table.cell>

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\Sunat\DocSunatType;
 use App\Enums\Sunat\DocIdentityType;
 use Greenter\Model\Sale\Charge;
 use App\Models\SaleDocument;
@@ -14,6 +15,7 @@ use Greenter\Model\Company\Company;
 use Greenter\Model\Sale\FormaPagos\FormaPagoContado;
 use Greenter\Model\Sale\Invoice;
 use Greenter\Model\Sale\Legend;
+use Greenter\Model\Sale\Note;
 use Greenter\Model\Sale\SaleDetail;
 use Greenter\Report\HtmlReport;
 use Greenter\Report\PdfReport;
@@ -28,11 +30,10 @@ class SunatService
     public function send(array $data, SaleDocument $sale): array
     {
         try {
-            $sunat = new SunatService;
-            $sunat->setLegends($data);
-            $see = $sunat->getSee($sale->company);
-            $invoice = $sunat->getInvoice($data, $sale);
-            $result = $see->send($invoice);
+            $this->setLegends($data);
+            $see = $this->getSee($sale->company);
+            $document = $this->getDocument($data, $sale);
+            $result = $see->send($document);
             $xml = $see->getFactory()->getLastXml();
             $hash = (new XmlUtils)->getHashSign($xml);
             return [
@@ -40,7 +41,7 @@ class SunatService
                 'xml' => $xml,
                 'hash' => $hash,
                 'pdfUrl' => route('sale.pdf', $sale->id),
-                'sunatResponse' => $sunat->sunatResponse($result),
+                'sunatResponse' => $this->sunatResponse($result),
                 'error' => null,
             ];
         } catch (\Throwable $e) {
@@ -58,6 +59,17 @@ class SunatService
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    public function getDocument(array $data, SaleDocument $sale): Invoice|Note
+    {
+        $docSunatType = (string) ($data['docSunatType'] ?? '');
+
+        if (in_array($docSunatType, [DocSunatType::NOTA_CREDITO->value, DocSunatType::NOTA_DEBITO->value], true)) {
+            return $this->getNote($data, $sale);
+        }
+
+        return $this->getInvoice($data, $sale);
     }
     public function getSee(CompanyModels $company)
     {
@@ -103,6 +115,45 @@ class SunatService
                 $invoice->setDescuentos($this->mapDiscountsToCharges($documentDiscounts));
             }
         return $invoice;
+    }
+    public function getNote(array $data, SaleDocument $sale): Note
+    {
+        $affectedDocNumber = null;
+        $affectedSerie = (string) ($data['affectedSerie'] ?? '');
+        $affectedCorrelative = (string) ($data['affectedCorrelative'] ?? '');
+
+        if ($affectedSerie !== '' && $affectedCorrelative !== '') {
+            $affectedDocNumber = $affectedSerie . '-' . $affectedCorrelative;
+        }
+
+        return (new Note())
+            ->setUblVersion($data['ublVersion'] ?? '2.1')
+            ->setTipoDoc($data['docSunatType'] ?? null) // Nota de crédito (07) / Nota de débito (08)
+            ->setSerie($data['serie'] ?? null)
+            ->setCorrelativo($data['correlative'] ?? null)
+            ->setFechaEmision(new DateTime($data['dateIssue'] ?? null))
+            ->setTipDocAfectado($data['affectedDocSunatType'] ?? null)
+            ->setNumDocfectado($affectedDocNumber)
+            ->setCodMotivo($data['noteReasonCode'] ?? null)
+            ->setDesMotivo($data['noteReasonDescription'] ?? null)
+            ->setTipoMoneda($data['currency'] ?? null)
+            ->setCompany($this->getCompany($sale->company))
+            ->setClient($this->getClient($sale->client ?? null))
+            ->setMtoOperGravadas($data['totalTaxed'] ?? null)
+            ->setMtoOperExoneradas($data['totalExempted'] ?? null)
+            ->setMtoOperInafectas($data['totalUnaffected'] ?? null)
+            ->setMtoOperExportacion($data['totalExport'] ?? null)
+            ->setMtoOperGratuitas($data['totalFree'] ?? null)
+            ->setMtoIGV($data['totalIgv'])
+            ->setMtoIGVGratuitas($data['totalIgvFree'])
+            ->setIcbper($data['icbper'])
+            ->setTotalImpuestos($data['totalTaxes'])
+            ->setValorVenta($data['saleValue'])
+            ->setSubTotal($data['subTotal'])
+            ->setRedondeo($data['rounding'])
+            ->setMtoImpVenta($data['total'])
+            ->setDetails($this->getDetails($data['items']))
+            ->setLegends($this->getLegends($data['legends']));
     }
     public function getCompany(CompanyModels $company)
     {
@@ -231,18 +282,19 @@ class SunatService
         return $response;
     }
 
-    public function getHtmlReport(Invoice $invoice, ?CompanyModels $company = null, ?string $hash = null): string
+    public function getHtmlReport(\Greenter\Model\DocumentInterface $document, ?CompanyModels $company = null, ?string $hash = null): string
     {
         $report = new HtmlReport(resource_path('templates'));
         $resolver = new DefaultTemplateResolver();
-        $report->setTemplate($resolver->getTemplate($invoice));
-        return $report->render($invoice, $this->reportParams($company, $hash, $invoice->getObservacion()));
+        $report->setTemplate($resolver->getTemplate($document));
+        $additionalInfo = $document instanceof Invoice ? $document->getObservacion() : null;
+        return $report->render($document, $this->reportParams($company, $hash, $additionalInfo));
     }
-    public function generatePdfReport(Invoice $invoice, ?CompanyModels $company = null, ?string $hash = null): string
+    public function generatePdfReport(\Greenter\Model\DocumentInterface $document, ?CompanyModels $company = null, ?string $hash = null): string
     {
         $htmlReport = new HtmlReport(resource_path('templates'));
         $resolver = new DefaultTemplateResolver();
-        $htmlReport->setTemplate($resolver->getTemplate($invoice));
+        $htmlReport->setTemplate($resolver->getTemplate($document));
         $report = new PdfReport($htmlReport);
         $report->setOptions( [
             'no-outline',
@@ -251,7 +303,8 @@ class SunatService
             'page-height' => '29.7cm',
         ]);
         $report->setBinPath(env('WKHTML_PDF_PATH'));
-        $pdf = $report->render($invoice, $this->reportParams($company, $hash, $invoice->getObservacion()));
+        $additionalInfo = $document instanceof Invoice ? $document->getObservacion() : null;
+        $pdf = $report->render($document, $this->reportParams($company, $hash, $additionalInfo));
 
         if ($pdf === null) {
             throw new \RuntimeException('No se pudo generar el PDF. Verifique `WKHTML_PDF_PATH` y que wkhtmltopdf este instalado.');

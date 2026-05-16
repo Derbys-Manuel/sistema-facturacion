@@ -3,12 +3,9 @@
     'fromModel' => 'from',
     'toModel' => 'to',
     'docSunatTypeModel' => 'docSunatType',
-    'operationTypeModel' => 'operationType',
     'docSunatTypeOptions' => [],
-    'operationTypeOptions' => [],
     'resetAction' => 'resetFilters',
 ])
-
 <div class="flex w-full items-center gap-2">
     <x-form.input
         wire:model.live.debounce.300ms="{{ $qModel }}"
@@ -52,15 +49,6 @@
                     wire:model.live="{{ $docSunatTypeModel }}"
                     :options="$docSunatTypeOptions"
                 />
-
-                <x-form.select
-                    type="simple"
-                    placeholder="Operación"
-                    icon-left="arrows-right-left"
-                    wire:model.live="{{ $operationTypeModel }}"
-                    :options="$operationTypeOptions"
-                />
-
                 <div class="h-px w-full bg-zinc-100"></div>
 
                 <x-form.button

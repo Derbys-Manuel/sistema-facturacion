@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\DocumentStatus;
 use App\Enums\DocumentType;
+use App\Enums\Sunat\CreditNoteReasonType;
 use App\Enums\Sunat\DocSunatType;
 use App\Enums\Sunat\OperationType;
 use App\Enums\Sunat\PaymentForm;
@@ -28,6 +29,14 @@ class SaleDocument extends BaseModel
         'currency',
         'serie',
         'correlative',
+
+        'affected_sale_document_id',
+        'affected_doc_sunat_type',
+        'affected_serie',
+        'affected_correlative',
+        'note_reason_code',
+        'note_reason_description',
+
         'credit_days',
         'num_quota',
         'total_taxed',
@@ -62,6 +71,8 @@ class SaleDocument extends BaseModel
         'status' => DocumentStatus::class,
         'document_type' => DocumentType::class,
         'doc_sunat_type' => DocSunatType::class,
+        'affected_doc_sunat_type' => DocSunatType::class,
+        'note_reason_code' => CreditNoteReasonType::class,
         'operation_type' => OperationType::class,
         'payment_form' => PaymentForm::class,
         'cdr' => 'array',
@@ -93,6 +104,23 @@ class SaleDocument extends BaseModel
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class, 'client_id');
+    }
+
+    public function affectedDocument(): BelongsTo
+    {
+        return $this->belongsTo(SaleDocument::class, 'affected_sale_document_id');
+    }
+
+    public function creditNotes(): HasMany
+    {
+        return $this->hasMany(SaleDocument::class, 'affected_sale_document_id')
+            ->where('doc_sunat_type', DocSunatType::NOTA_CREDITO->value);
+    }
+
+    public function debitNotes(): HasMany
+    {
+        return $this->hasMany(SaleDocument::class, 'affected_sale_document_id')
+            ->where('doc_sunat_type', DocSunatType::NOTA_DEBITO->value);
     }
 
     public function items(): HasMany

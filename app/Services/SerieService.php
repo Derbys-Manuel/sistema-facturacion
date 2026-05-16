@@ -6,10 +6,18 @@ use App\Models\Serie;
 
 class SerieService
 {
-    public function getSerieForUpdate(string $docSunatType, string $companyId): Serie
+    public function getSerieForUpdate(
+        string $docSunatType,
+        string $companyId,
+        ?string $affectedDocSunatType = null,
+    ): Serie
     {
         return Serie::query()
             ->where('doc_sunat_type', $docSunatType)
+            ->when(
+                filled($affectedDocSunatType),
+                fn ($query) => $query->where('affected_doc_sunat_type', $affectedDocSunatType),
+            )
             ->where('company_id', $companyId)
             ->where('is_active', true)
             ->lockForUpdate()

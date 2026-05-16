@@ -111,7 +111,7 @@ class SaleItemForm extends Form
             ) {
                 $discountForm->store(
                     discounts: $itemDiscounts,
-                    saleDocumentId: $docId,
+                    saleDocumentId: null,
                     saleDocumentItemId: (string) $createdItem->id
                 );
             }
