@@ -374,7 +374,6 @@ class SaleForm extends Form
         ?string $to = null,
         ?string $q = null,
         ?string $docSunatType = null,
-        ?string $operationType = null,
         ?string $companyId = null,
     ): array {
         return $this->documentsQuery(
@@ -383,7 +382,6 @@ class SaleForm extends Form
             to: $to,
             q: $q,
             docSunatType: $docSunatType,
-            operationType: $operationType,
             companyId: $companyId,
         )
             ->with(['items', 'client', 'company'])
@@ -397,7 +395,6 @@ class SaleForm extends Form
         ?string $to = null,
         ?string $q = null,
         ?string $docSunatType = null,
-        ?string $operationType = null,
         ?string $companyId = null,
     ): array {
         $query = $this->documentsQuery(
@@ -406,10 +403,12 @@ class SaleForm extends Form
             to: $to,
             q: $q,
             docSunatType: $docSunatType,
-            operationType: $operationType,
             companyId: $companyId,
         );
-        $total = (float) (clone $query)->sum('total');
+        $creditNoteType = DocSunatType::NOTA_CREDITO->value;
+        $total = (float) (clone $query)
+            ->selectRaw('coalesce(sum(case when doc_sunat_type = ? then -total else total end),0) as signed_total', [$creditNoteType])
+            ->value('signed_total');
         $boletas = (float) (clone $query)
             ->where('doc_sunat_type', DocSunatType::BOLETA->value)
             ->sum('total');
@@ -417,15 +416,16 @@ class SaleForm extends Form
             ->where('doc_sunat_type', DocSunatType::FACTURA->value)
             ->sum('total');
         $totalIgv = (float) (clone $query)
-            ->sum('total_igv');
+            ->selectRaw('coalesce(sum(case when doc_sunat_type = ? then -total_igv else total_igv end),0) as signed_total_igv', [$creditNoteType])
+            ->value('signed_total_igv');
         $saleValue = (float) (clone $query)
-            ->sum('sale_value');
-        
+            ->selectRaw('coalesce(sum(case when doc_sunat_type = ? then -sale_value else sale_value end),0) as signed_sale_value', [$creditNoteType])
+            ->value('signed_sale_value');
         return [
             'boletas' => $boletas,
             'facturas' => $facturas,
-            'totalIgv' =>$totalIgv,
-            'saleValue' =>$saleValue,
+            'totalIgv' => $totalIgv,
+            'saleValue' => $saleValue,
             'total' => $total,
         ];
     }
@@ -436,7 +436,6 @@ class SaleForm extends Form
         ?string $to = null,
         ?string $q = null,
         ?string $docSunatType = null,
-        ?string $operationType = null,
         ?string $companyId = null,
     ): Builder {
         $q = filled($q) ? trim((string) $q) : null;
@@ -454,7 +453,6 @@ class SaleForm extends Form
             ->when($from, fn ($query) => $query->whereDate('date_issue', '>=', $from))
             ->when($to, fn ($query) => $query->whereDate('date_issue', '<=', $to))
             ->when($docSunatType, fn ($query) => $query->where('doc_sunat_type', $docSunatType))
-            ->when($operationType, fn ($query) => $query->where('operation_type', $operationType))
             ->when(
                 $q,
                 fn ($query) => $query->where(

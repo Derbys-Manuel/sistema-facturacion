@@ -392,7 +392,7 @@ new class extends Component
             );
             return;
         }
-        if (! $this->sale->clientId) {
+        if ($this->sale->affectedDocSunatType === DocSunatType::FACTURA->value) {
             Flux::toast(
                 heading: 'Alerta',
                 text: 'Debe de seleccionar un cliente',

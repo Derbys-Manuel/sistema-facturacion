@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\Sunat\DocSunatType;
-use App\Enums\Sunat\OperationType;
 use App\Enums\DocumentStatus;
 use App\Livewire\Forms\SaleForm;
 use Illuminate\Support\Carbon;
@@ -20,7 +19,6 @@ new class extends Component
     public ?string $to = null;
     public ?string $q = null;
     public ?string $docSunatType = null;
-    public ?string $operationType = null;
     public ?string $companyId = null;
     public bool $companyReady = false;
 
@@ -52,7 +50,6 @@ new class extends Component
         $this->to = null;
         $this->q = null;
         $this->docSunatType = null;
-        $this->operationType = null;
 
         $this->resetPage();
     }
@@ -69,7 +66,6 @@ new class extends Component
     public function updatedTo(): void { $this->resetPage(); }
     public function updatedQ(): void { $this->resetPage(); }
     public function updatedDocSunatType(): void { $this->resetPage(); }
-    public function updatedOperationType(): void { $this->resetPage(); }
 
     public function getSummaryProperty(): array
     {
@@ -88,7 +84,6 @@ new class extends Component
             to: $this->to,
             q: $this->q,
             docSunatType: $this->docSunatType,
-            operationType: $this->operationType,
             companyId: $this->companyId,
         );
     }
@@ -116,7 +111,6 @@ new class extends Component
             to: $this->to,
             q: $this->q,
             docSunatType: $this->docSunatType,
-            operationType: $this->operationType,
             companyId: $this->companyId,
         );
     }
@@ -127,14 +121,7 @@ new class extends Component
             ['value' => null, 'label' => 'Todos'],
             ['value' => DocSunatType::BOLETA->value, 'label' => 'Boleta'],
             ['value' => DocSunatType::FACTURA->value, 'label' => 'Factura'],
-        ];
-    }
-
-    public function getOperationTypeOptionsProperty(): array
-    {
-        return [
-            ['value' => null, 'label' => 'Todos'],
-            ['value' => OperationType::INTERNAL_SALE->value, 'label' => 'Venta interna'],
+            ['value' => DocSunatType::NOTA_CREDITO->value, 'label' => 'Nota de crédito'],
         ];
     }
 
@@ -143,6 +130,7 @@ new class extends Component
         return match ($value) {
             DocSunatType::BOLETA->value => 'Boleta',
             DocSunatType::FACTURA->value => 'Factura',
+            DocSunatType::NOTA_CREDITO->value => 'Nota de crédito',
             default => $value ?: '-',
         };
     }
@@ -332,7 +320,6 @@ new class extends Component
         <div class="grid grid-cols-[0.6fr_auto] items-start gap-3 mb-2">
             <x-sale.filters
                 :doc-sunat-type-options="$this->docSunatTypeOptions"
-                :operation-type-options="$this->operationTypeOptions"
                 reset-action="resetFilters"
             />
             <div class="relative mt-2">
