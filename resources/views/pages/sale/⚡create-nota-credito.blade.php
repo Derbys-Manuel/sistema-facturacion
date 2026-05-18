@@ -99,8 +99,13 @@ new class extends Component
         }
         $data = $sale->toArray();
 
-        $this->sale->companyId = (string) ($data['companyId'] ?? $this->sale->companyId);
-        $this->sale->clientId = (string) ($data['clientId'] ?? $this->sale->clientId);
+        $this->sale->clientId = filled($data['clientId'] ?? null)
+            ? (string) $data['clientId']
+            : null;
+
+        $this->sale->companyId = filled($data['companyId'] ?? null)
+            ? (string) $data['companyId']
+            : null;
         $this->sale->additionalInfo = $data['additionalInfo'] ?? null;
 
         $this->sale->affectedSaleDocumentId = (string) ($data['affectedSaleDocumentId'] ?? $this->sale->affectedSaleDocumentId);
@@ -459,6 +464,7 @@ new class extends Component
                             <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Descripción</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Cant.</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Precio u.</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">Descuento</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Total</th>
                             <th class="px-2 py-3"></th>
                         </tr>
@@ -482,6 +488,17 @@ new class extends Component
                                 <span class="text-sm tabular-nums">
                                     S/ {{ number_format((float) ($item['unitPrice'] ?? 0), 2) }}
                                 </span>
+                            </x-ui.table.cell>
+                            <x-ui.table.cell dense class="text-center">
+                                <div class="text-xs text-zinc-500">
+                                    Base: S/ {{ number_format((float) data_get($item, 'discounts.0.baseAmount', 0), 2) }}
+                                </div>
+                                <div class="text-sm font-medium tabular-nums text-zinc-800">
+                                    S/ {{ number_format((float) data_get($item, 'discounts.0.discountAmount', 0), 2) }}
+                                    <span class="text-xs text-zinc-500">
+                                        ({{ number_format((float) data_get($item, 'discounts.0.uiPercent', 0), 2) }}%)
+                                    </span>
+                                </div>
                             </x-ui.table.cell>
                             <x-ui.table.cell dense>
                                 <span class="text-sm font-semibold tabular-nums">
@@ -509,13 +526,33 @@ new class extends Component
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-4 py-8 text-center text-sm text-zinc-500">
+                            <td colspan="6" class="px-4 py-8 text-center text-sm text-zinc-500">
                                 No ha agregado ningún producto
                             </td>
                         </tr>
                     @endforelse
                 </x-ui.table>
+                @php
+                    $discountTotal = collect($items)
+                        ->sum(fn ($item) => (float) data_get($item, 'discounts.0.discountAmount', 0));
+
+                    $baseBeforeDiscount = (float) ($sale->saleValue ?? 0) + $discountTotal;
+                @endphp
                 <div class="px-4 py-0 space-y-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-zinc-500">Base original</span>
+                        <div class="rounded-sm border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold tabular-nums">
+                            S/ {{ number_format($baseBeforeDiscount, 2) }}
+                        </div>
+                    </div>
+                    @if ($discountTotal > 0)
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-red-500">Descuento total</span>
+                            <div class="rounded-sm border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold tabular-nums text-red-600">
+                                - S/ {{ number_format($discountTotal, 2) }}
+                            </div>
+                        </div>
+                    @endif
                     <div class="flex items-center justify-between">
                         <span class="text-xs text-zinc-500">Base imponible</span>
                         <div class="rounded-sm border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold tabular-nums">

@@ -14,9 +14,39 @@ use App\Models\SaleDocument;
 use App\Models\SaleDocumentItem;
 use App\Models\Serie;
 use App\Services\SerieService;
+use App\Services\SunatService;
 use Livewire\Livewire;
 
 it('creates a credit note from the nota credito page', function () {
+    $captured = null;
+
+    app()->instance(SunatService::class, new class($captured) extends SunatService
+    {
+        public mixed $captured;
+
+        public function __construct(mixed &$captured)
+        {
+            $this->captured = &$captured;
+        }
+
+        public function send(array $data, SaleDocument $sale): array
+        {
+            $this->captured = $data;
+
+            return [
+                'success' => true,
+                'xml' => '<xml/>',
+                'hash' => 'hash',
+                'pdfUrl' => route('sale.pdf', $sale->id),
+                'sunatResponse' => [
+                    'success' => true,
+                    'error' => null,
+                ],
+                'error' => null,
+            ];
+        }
+    });
+
     $company = Company::create([
         'company_name' => 'Test Company SAC',
         'ruc' => '20123456789',
@@ -95,16 +125,16 @@ it('creates a credit note from the nota credito page', function () {
             'code' => 'P001',
             'description' => 'Producto',
             'unit' => 'NIU',
-            'quantity' => 1,
+            'quantity' => 2,
             'unitValue' => 100,
-            'itemValue' => 100,
+            'itemValue' => 180,
             'unitPrice' => 118,
-            'igvBaseAmount' => 100,
+            'igvBaseAmount' => 180,
             'igvPercent' => 18,
-            'igvAmount' => 18,
-            'taxesTotal' => 18,
+            'igvAmount' => 32.40,
+            'taxesTotal' => 32.40,
             'discounts' => [],
-            'total' => 118,
+            'total' => 212.40,
         ],
     ];
 
@@ -135,6 +165,18 @@ it('creates a credit note from the nota credito page', function () {
         'note_reason_description' => 'AnulaciÃ³n de la operaciÃ³n',
         'status' => DocumentStatus::DRAFT->value,
     ]);
+
+    $saleDocumentId = (string) SaleDocument::query()
+        ->where('doc_sunat_type', DocSunatType::NOTA_CREDITO->value)
+        ->value('id');
+
+    Livewire::test('send-modal', ['saleId' => $saleDocumentId])
+        ->call('sendSunat')
+        ->assertHasNoErrors();
+
+    expect(is_array($captured))->toBeTrue();
+    expect((string) ($captured['docSunatType'] ?? ''))->toBe(DocSunatType::NOTA_CREDITO->value);
+    expect((float) data_get($captured, 'items.0.discounts.0.discountAmount', 0))->toBeGreaterThan(0);
 });
 
 it('prefills the credit note page from an approved voucher', function () {

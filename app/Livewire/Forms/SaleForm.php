@@ -358,11 +358,6 @@ class SaleForm extends Form
         $data['items'] = $saleService->hydrateItemsForSunatFromDatabase($data['items'] ?? []);
 
         $docSunatType = (string) ($data['docSunatType'] ?? '');
-        if (in_array($docSunatType, [DocSunatType::NOTA_CREDITO->value, DocSunatType::NOTA_DEBITO->value], true)) {
-            $data['items'] = collect($data['items'])
-                ->map(fn ($item) => is_array($item) ? $saleService->normalizeItemDiscountForSunat($item) : $item)
-                ->all();
-        }
 
         if ($docSunatType === DocSunatType::NOTA_CREDITO->value) {
             $affectedSaleDocumentId = (string) ($data['affectedSaleDocumentId'] ?? '');
