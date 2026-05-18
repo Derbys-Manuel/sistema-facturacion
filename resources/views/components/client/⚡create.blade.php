@@ -71,14 +71,14 @@ new class extends Component
                 heading: 'Aviso',
                 text: 'Cliente guardado con éxito',
                 variant: 'success',
-                duration: 1000);                   
+                duration: 2000);                   
         } catch (\Throwable $th) {
             report($th);
             Flux::toast(
                 heading: 'Aviso',
-                text: 'Error al guardar cliente',
+                text: 'Error al guardar cliente '. $th->getMessage(),
                 variant: 'error',
-                duration: 1000);
+                duration: 3000);
         }
     }
 };

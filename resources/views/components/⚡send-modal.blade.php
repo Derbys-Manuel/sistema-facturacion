@@ -58,24 +58,6 @@ new class extends Component
                 ->all();
 
             $docSunatType = (string) ($data['docSunatType'] ?? '');
-            if (in_array($docSunatType, [DocSunatType::NOTA_CREDITO->value, DocSunatType::NOTA_DEBITO->value], true)) {
-                $data['items'] = collect($data['items'])
-                    ->map(fn ($item) => is_array($item) ? $saleService->normalizeItemDiscountForSunat($item) : $item)
-                    ->map(function ($item) {
-                        if (! is_array($item)) {
-                            return $item;
-                        }
-
-                        $item['discounts'] = collect($item['discounts'] ?? [])
-                            ->filter(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)
-                            ->values()
-                            ->all();
-
-                        return $item;
-                    })
-                    ->values()
-                    ->all();
-            }
 
             if ($docSunatType === DocSunatType::NOTA_CREDITO->value) {
                 $affectedSaleDocumentId = (string) ($data['affectedSaleDocumentId'] ?? '');

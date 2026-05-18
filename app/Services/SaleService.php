@@ -218,7 +218,9 @@ class SaleService
                 $calculated['totalTaxes'] = (string) ($item['totalTaxes'] ?? $calculated['totalTaxes']);
                 $calculated['taxesTotal'] = (string) ($item['taxesTotal'] ?? $calculated['taxesTotal']);
 
-                $discountAmount = (float) data_get($item, 'discounts.0.discountAmount', 0);
+                $calculated = $this->normalizeItemDiscountForSunat($calculated);
+
+                $discountAmount = (float) data_get($calculated, 'discounts.0.discountAmount', 0);
                 $quantity = (float) ($calculated['quantity'] ?? 0);
                 if ($discountAmount > 0 && $quantity > 0) {
                     $lineTotalWithTaxes = (float) ($calculated['itemValue'] ?? 0) + (float) ($calculated['totalTaxes'] ?? 0);
