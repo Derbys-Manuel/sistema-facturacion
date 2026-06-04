@@ -218,15 +218,21 @@ class SaleService
                 $calculated['totalTaxes'] = (string) ($item['totalTaxes'] ?? $calculated['totalTaxes']);
                 $calculated['taxesTotal'] = (string) ($item['taxesTotal'] ?? $calculated['taxesTotal']);
 
-                $calculated = $this->normalizeItemDiscountForSunat($calculated);
+                $calculated['total'] = (string) ($item['total'] ?? $calculated['total']);
+                $calculated['unitPriceWithDiscount'] = (string) ($item['unitPriceWithDiscount'] ?? $calculated['unitPriceWithDiscount']);
+                $calculated['totalWithoutDiscount'] = (string) ($item['totalWithoutDiscount'] ?? $calculated['totalWithoutDiscount']);
+                $calculated['discountAmount'] = (string) ($item['discountAmount'] ?? $calculated['discountAmount']);
 
-                $discountAmount = (float) data_get($calculated, 'discounts.0.discountAmount', 0);
-                $quantity = (float) ($calculated['quantity'] ?? 0);
-                if ($discountAmount > 0 && $quantity > 0) {
-                    $lineTotalWithTaxes = (float) ($calculated['itemValue'] ?? 0) + (float) ($calculated['totalTaxes'] ?? 0);
-                    $unitPriceWithDiscount = round($lineTotalWithTaxes / $quantity, 2);
-                    $calculated['unitPriceWithDiscount'] = number_format($unitPriceWithDiscount, 2, '.', '');
-                }
+                // $calculated = $this->normalizeItemDiscountForSunat($calculated);
+
+                // $discountAmount = (float) data_get($calculated, 'discounts.0.discountAmount', 0);
+                // $quantity = (float) ($calculated['quantity'] ?? 0);
+                // if ($discountAmount > 0 && $quantity > 0) {
+                //     $lineTotalWithTaxes = (float) ($calculated['itemValue'] ?? 0) + (float) ($calculated['totalTaxes'] ?? 0);
+                //     $unitPriceWithDiscount = round($lineTotalWithTaxes / $quantity, 2);
+                //     $calculated['unitPriceWithDiscount'] = number_format($unitPriceWithDiscount, 2, '.', '');
+                // }
+                
                 return $calculated;
             })
             ->values()
