@@ -317,14 +317,14 @@
     x-on:wheel.window.throttle.50ms="open && updateDropdownPosition()"
 >
     @if ($label)
-        <flux:label class="mb-3 text-gray-700 text-sm">
+        <flux:label class="mb-1.5 text-xs text-gray-700">
             {{ $label }}
         </flux:label>
     @endif
 
     <div
         x-ref="trigger"
-        class="group relative flex h-10 w-full items-center overflow-hidden rounded-sm border bg-white shadow-sm transition
+        class="group relative flex h-8 w-full items-center overflow-hidden rounded-sm border bg-white shadow-sm transition
         {{ $error
             ? 'border-red-400 ring-2 ring-red-100'
             : 'border-zinc-200 hover:border-zinc-300 focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-100'
@@ -333,7 +333,7 @@
     >
         <button
             type="button"
-            class="flex h-full w-full items-center gap-2 px-3 text-left text-sm disabled:cursor-not-allowed"
+            class="flex h-full w-full items-center gap-2 px-3 text-left text-xs disabled:cursor-not-allowed"
             x-on:click="openPicker()"
             @disabled($disabled)
         >

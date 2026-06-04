@@ -1,10 +1,6 @@
 <?php
 
-use App\Enums\DocumentStatus;
-use App\Models\SaleDocument;
-use App\Services\SaleService;
-use App\Services\SunatService;
-use App\Enums\Sunat\DocSunatType;
+use App\Jobs\SendSaleDocumentToSunat;
 use Flux\Flux;
 use Livewire\Component;
 
@@ -20,7 +16,7 @@ new class extends Component
         Flux::modal('confirm')->close();
     }
 
-    public function sendSunat(SunatService $sunatService, SaleService $saleService): void
+    public function sendSunat(): void
     {
         if (blank($this->saleId)) {
             Flux::toast(
@@ -31,84 +27,16 @@ new class extends Component
             );
             return;
         }
-        try {
-            $sale = SaleDocument::query()
-                ->with(['items', 'client', 'company', 'discounts', 'items.discounts'])
-                ->findOrFail($this->saleId);
-            $data = $sale->toArray();
-            $data['discounts'] = collect($data['discounts'] ?? [])
-                ->filter(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)
-                ->values()
-                ->all();
-            $data['items'] = $saleService->hydrateItemsForSunatFromDatabase($data['items'] ?? []);
-            $data['items'] = collect($data['items'])
-                ->map(function ($item) {
-                    if (! is_array($item)) {
-                        return $item;
-                    }
+        SendSaleDocumentToSunat::dispatch($this->saleId);
 
-                    $item['discounts'] = collect($item['discounts'] ?? [])
-                        ->filter(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)
-                        ->values()
-                        ->all();
-
-                    return $item;
-                })
-                ->values()
-                ->all();
-
-            $docSunatType = (string) ($data['docSunatType'] ?? '');
-
-            if ($docSunatType === DocSunatType::NOTA_CREDITO->value) {
-                $affectedSaleDocumentId = (string) ($data['affectedSaleDocumentId'] ?? '');
-                if (filled($affectedSaleDocumentId)) {
-                    $affected = SaleDocument::query()->find($affectedSaleDocumentId);
-
-                    if ($affected) {
-                        $creditNoteTotal = round((float) ($data['total'] ?? 0), 2);
-                        $affectedTotal = round((float) ($affected->total ?? 0), 2);
-
-                        if ($creditNoteTotal > $affectedTotal) {
-                            Flux::toast(
-                                heading: 'Alerta',
-                                text: 'La nota de crédito no puede exceder el total del comprobante afectado.',
-                                variant: 'warning',
-                                duration: 4000
-                            );
-                            return;
-                        }
-                    }
-                }
-            }
-            $response = $sunatService->send($data, $sale);
-            $sunatSuccess = $response['sunatResponse']['success'] ?? false;
-            $sale->update([
-                'xml' => $response['xml'] ?? null,
-                'hash' => $response['hash'] ?? null,
-                'cdr' => $response['sunatResponse'] ?? null,
-                'status' => $sunatSuccess
-                    ? DocumentStatus::APPROVED->value
-                    : DocumentStatus::REJECTED->value,
-            ]);
-            Flux::toast(
-                heading: $sunatSuccess ? 'SUNAT' : 'Comprobante rechazado',
-                text: $sunatSuccess
-                    ? 'Comprobante aceptado por SUNAT'
-                    : ($response['sunatResponse']['error']['message'] ?? 'SUNAT rechazó el comprobante'),
-                variant: $sunatSuccess ? 'success' : 'warning',
-                duration: 4000
-            );
-            $this->dispatch('closed-modal-send');
-            $this->close();
-        } catch (\Throwable $th) {
-            report($th);
-            Flux::toast(
-                heading: 'Error',
-                text: $th->getMessage() ?: 'No se pudo enviar el comprobante',
-                variant: 'warning',
-                duration: 4000
-            );
-        }
+        Flux::toast(
+            heading: 'SUNAT',
+            text: 'El comprobante fue agregado a la cola de envío.',
+            variant: 'success',
+            duration: 3000
+        );
+        $this->dispatch('closed-modal-send');
+        $this->close();
     }
 };
 ?>

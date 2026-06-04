@@ -2,21 +2,24 @@
 
 namespace App\Livewire\Forms;
 
+use App\Models\Product;
 use Livewire\Attributes\Validate;
 use Livewire\Form;
-use App\Models\Product;
-
 
 class ProductForm extends Form
 {
     #[Validate('nullable|string')]
-    public ?string $id = null;    
+    public ?string $id = null;
+
     #[Validate('string|required')]
-    public string $name='';
+    public string $name = '';
+
     #[Validate('string|required')]
     public ?string $unit = 'NIU';
-    #[Validate('nullable|numeric')]
-    public ?int $price = null;
+
+    #[Validate('nullable|numeric|min:0')]
+    public int|float|null $price = null;
+
     #[Validate('nullable|string')]
     public ?string $sku = null;
 
@@ -30,12 +33,15 @@ class ProductForm extends Form
             'price' => $this->price,
             'is_active' => true,
         ]);
+
         return $product->toArray();
-    } 
+    }
+
     public function getRecord(string $id): Product
     {
         return Product::findOrFail($id);
     }
+
     public function update(): Product
     {
         $this->validate();
@@ -55,15 +61,14 @@ class ProductForm extends Form
     public function search(string $q): array
     {
         return Product::query()
-            ->when($q,fn ($query) =>
-                    $query->where(fn ($subQuery) =>
-                        $subQuery->where('name', 'ilike', "%{$q}%")
-                                ->orWhere('unit', 'ilike', "%{$q}%")
-                                ->orWhere('sku', 'ilike', "%{$q}%")
-                    )
-            )->limit(20)->get()->map(fn($p)=>[
+            ->select(['id', 'name', 'unit', 'sku'])
+            ->when($q, fn ($query) => $query->where(fn ($subQuery) => $subQuery->where('name', 'ilike', "%{$q}%")
+                ->orWhere('unit', 'ilike', "%{$q}%")
+                ->orWhere('sku', 'ilike', "%{$q}%")
+            )
+            )->limit(20)->get()->map(fn ($p) => [
                 'value' => (string) $p->id,
-                'label' => $p->name.' '. $p->unit .' '. $p->sku,
+                'label' => $p->name.' '.$p->unit.' '.$p->sku,
             ])->toArray();
     }
 }

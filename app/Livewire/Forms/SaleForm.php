@@ -2,22 +2,19 @@
 
 namespace App\Livewire\Forms;
 
+use App\Actions\Sales\SendSaleDocumentToSunatAction;
 use App\Enums\DocumentStatus;
-use App\Enums\Sunat\DocSunatType;
-use Illuminate\Support\Str;
-use App\Models\SaleDocument;
-use App\Services\SerieService;
-use App\Services\SaleService;
-use Illuminate\Database\Eloquent\Builder;
-use Livewire\Form;
-use Livewire\Attributes\Validate;
 use App\Enums\DocumentType;
+use App\Enums\Sunat\DocSunatType;
 use App\Enums\Sunat\OperationType;
 use App\Enums\Sunat\PaymentForm;
+use App\Models\SaleDocument;
+use App\Services\SerieService;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use App\Services\SunatService;
-use App\Livewire\Forms\SaleItemForm;
-use App\Livewire\Forms\DiscountForm;
+use Livewire\Attributes\Validate;
+use Livewire\Form;
 
 class SaleForm extends Form
 {
@@ -56,7 +53,7 @@ class SaleForm extends Form
 
     #[Validate('nullable|string|max:10')]
     public $currency = 'PEN';
-                
+
     #[Validate('nullable|integer|min:0')]
     public $creditDays = null;
 
@@ -103,7 +100,7 @@ class SaleForm extends Form
     public $rounding = 0;
 
     #[Validate('numeric|min:0')]
-    public $total = 0;                                                                                                               
+    public $total = 0;
 
     #[Validate('required')]
     public $dateIssue;
@@ -122,6 +119,7 @@ class SaleForm extends Form
 
     #[Validate('nullable|string')]
     public ?string $clientId = null;
+
     #[Validate('nullable|array|min:1')]
     public array $items = [];
 
@@ -165,12 +163,12 @@ class SaleForm extends Form
             'noteReasonDescription' => 'descripción del motivo',
         ];
     }
+
     public function store(
-        SaleItemForm $itemForm, 
+        SaleItemForm $itemForm,
         SerieService $serieService,
         DiscountForm $discountForm
-    ): array
-    {
+    ): array {
         $data = $this->validate();
         $sale = DB::transaction(function () use (
             $data,
@@ -230,7 +228,7 @@ class SaleForm extends Form
                 'status' => DocumentStatus::DRAFT->value,
                 'company_id' => $data['companyId'] ?? null,
                 'client_id' => $data['clientId'] ?? null,
-                'sunat_state'=> true
+                'sunat_state' => true,
             ])->load('company', 'client');
             $saleDiscounts = $data['discounts'] ?? [];
             if (is_array($saleDiscounts) && collect($saleDiscounts)->contains(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)) {
@@ -241,6 +239,7 @@ class SaleForm extends Form
                 );
             }
             $itemForm->store($data['items'], (string) $sale->id, $discountForm);
+
             return $sale;
         });
 
@@ -259,9 +258,11 @@ class SaleForm extends Form
                     ->filter(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)
                     ->values()
                     ->all();
+
                 return $item;
             })
             ->all();
+
         return [
             'saleId' => (string) $sale->id,
             'pdfUrl' => route('sale.pdf', $sale->id),
@@ -340,6 +341,7 @@ class SaleForm extends Form
                 );
             }
             $itemForm->store($data['items'], (string) $sale->id, $discountForm);
+
             return $sale->load('company', 'client');
         });
 
@@ -348,50 +350,12 @@ class SaleForm extends Form
             'pdfUrl' => route('sale.pdf', $sale->id),
         ];
     }
-    public function send(string $saleId, SunatService $sunatService, SaleService $saleService): array
+
+    public function send(string $saleId, SendSaleDocumentToSunatAction $sendSaleDocumentToSunat): array
     {
-        $sale = SaleDocument::query()
-            ->with(['items', 'client', 'company', 'items.discounts'])
-            ->findOrFail($saleId);
-
-        $data = $sale->toArray();
-        $data['items'] = $saleService->hydrateItemsForSunatFromDatabase($data['items'] ?? []);
-
-        $docSunatType = (string) ($data['docSunatType'] ?? '');
-
-        if ($docSunatType === DocSunatType::NOTA_CREDITO->value) {
-            $affectedSaleDocumentId = (string) ($data['affectedSaleDocumentId'] ?? '');
-            if (filled($affectedSaleDocumentId)) {
-                $affected = SaleDocument::query()->find($affectedSaleDocumentId);
-
-                if ($affected) {
-                    $creditNoteTotal = round((float) ($data['total'] ?? 0), 2);
-                    $affectedTotal = round((float) ($affected->total ?? 0), 2);
-
-                    if ($creditNoteTotal > $affectedTotal) {
-                        return [
-                            'sunat' => [
-                                'success' => false,
-                                'error' => "La nota de crédito no puede exceder el total del comprobante afectado ({$affectedTotal}).",
-                            ],
-                        ];
-                    }
-                }
-            }
-        }
-
-        $response = $sunatService->send($data, $sale);
-        $sunatSuccess = $response['sunatResponse']['success'] ?? false;
-        $sale->update([
-            'xml' => $response['xml'] ?? null,
-            'hash' => $response['hash'] ?? null,
-            'cdr' => $response['sunatResponse'] ?? null,
-            'status' => $sunatSuccess
-                ? DocumentStatus::APPROVED->value
-                : DocumentStatus::REJECTED->value,
-        ]);
-        return ['sunat' => $response];
+        return $sendSaleDocumentToSunat->handle($saleId);
     }
+
     public function list(
         ?bool $deletedBool = null,
         ?string $from = null,
@@ -408,11 +372,27 @@ class SaleForm extends Form
             docSunatType: $docSunatType,
             companyId: $companyId,
         )
-            ->with(['items', 'client', 'company'])
+            ->select([
+                'id',
+                'date_issue',
+                'serie',
+                'correlative',
+                'affected_sale_document_id',
+                'affected_serie',
+                'affected_correlative',
+                'client_id',
+                'doc_sunat_type',
+                'total',
+                'status',
+                'cdr',
+                'sunat_state',
+            ])
+            ->with('client:id,name,trade_name,document_number')
             ->latest('date_issue')
             ->paginate(15)
             ->toArray();
     }
+
     public function summary(
         ?bool $deletedBool = null,
         ?string $from = null,
@@ -429,28 +409,31 @@ class SaleForm extends Form
             docSunatType: $docSunatType,
             companyId: $companyId,
         );
-        $creditNoteType = DocSunatType::NOTA_CREDITO->value;
-        $total = (float) (clone $query)
-            ->selectRaw('coalesce(sum(case when doc_sunat_type = ? then -total else total end),0) as signed_total', [$creditNoteType])
-            ->value('signed_total');
-        $boletas = (float) (clone $query)
-            ->where('doc_sunat_type', DocSunatType::BOLETA->value)
-            ->sum('total');
-        $facturas = (float) (clone $query)
-            ->where('doc_sunat_type', DocSunatType::FACTURA->value)
-            ->sum('total');
-        $totalIgv = (float) (clone $query)
-            ->selectRaw('coalesce(sum(case when doc_sunat_type = ? then -total_igv else total_igv end),0) as signed_total_igv', [$creditNoteType])
-            ->value('signed_total_igv');
-        $saleValue = (float) (clone $query)
-            ->selectRaw('coalesce(sum(case when doc_sunat_type = ? then -sale_value else sale_value end),0) as signed_sale_value', [$creditNoteType])
-            ->value('signed_sale_value');
+        $summary = $query
+            ->selectRaw(
+                <<<'SQL'
+                    coalesce(sum(case when doc_sunat_type = ? then total else 0 end), 0) as boletas,
+                    coalesce(sum(case when doc_sunat_type = ? then total else 0 end), 0) as facturas,
+                    coalesce(sum(case when doc_sunat_type = ? then -total_igv else total_igv end), 0) as signed_total_igv,
+                    coalesce(sum(case when doc_sunat_type = ? then -sale_value else sale_value end), 0) as signed_sale_value,
+                    coalesce(sum(case when doc_sunat_type = ? then -total else total end), 0) as signed_total
+                SQL,
+                [
+                    DocSunatType::BOLETA->value,
+                    DocSunatType::FACTURA->value,
+                    DocSunatType::NOTA_CREDITO->value,
+                    DocSunatType::NOTA_CREDITO->value,
+                    DocSunatType::NOTA_CREDITO->value,
+                ],
+            )
+            ->first();
+
         return [
-            'boletas' => $boletas,
-            'facturas' => $facturas,
-            'totalIgv' => $totalIgv,
-            'saleValue' => $saleValue,
-            'total' => $total,
+            'boletas' => (float) ($summary?->boletas ?? 0),
+            'facturas' => (float) ($summary?->facturas ?? 0),
+            'totalIgv' => (float) ($summary?->signed_total_igv ?? 0),
+            'saleValue' => (float) ($summary?->signed_sale_value ?? 0),
+            'total' => (float) ($summary?->signed_total ?? 0),
         ];
     }
 
@@ -471,11 +454,11 @@ class SaleForm extends Form
                 fn ($query) => $query->where('sunat_state', false),
                 fn ($query) => $query->where(function ($q) {
                     $q->where('sunat_state', true)
-                    ->orWhereNull('sunat_state');
+                        ->orWhereNull('sunat_state');
                 })
             )
-            ->when($from, fn ($query) => $query->whereDate('date_issue', '>=', $from))
-            ->when($to, fn ($query) => $query->whereDate('date_issue', '<=', $to))
+            ->when($from, fn ($query) => $query->where('date_issue', '>=', Carbon::parse($from)->startOfDay()))
+            ->when($to, fn ($query) => $query->where('date_issue', '<', Carbon::parse($to)->addDay()->startOfDay()))
             ->when($docSunatType, fn ($query) => $query->where('doc_sunat_type', $docSunatType))
             ->when(
                 $q,
@@ -502,11 +485,14 @@ class SaleForm extends Form
                 )
             );
     }
+
     public function searchAffectedDocuments(string $companyId, ?string $affectedDocSunatType = null, string $q = ''): array
     {
         $affectedDocSunatType = (string) ($affectedDocSunatType ?: DocSunatType::BOLETA->value);
         $q = filled($q) ? trim((string) $q) : null;
+
         return SaleDocument::query()
+            ->select(['id', 'serie', 'correlative'])
             ->where('company_id', $companyId)
             ->where('doc_sunat_type', $affectedDocSunatType)
             ->where('status', DocumentStatus::APPROVED->value)
@@ -518,17 +504,14 @@ class SaleForm extends Form
             ->limit(20)
             ->get()
             ->map(function (SaleDocument $sale) {
-                $data = $sale->toArray();
-
-                $number = (string) (($data['serie'] ?? '') . '-' . ($data['correlative'] ?? ''));
+                $number = (string) (($sale->serie ?? '').'-'.($sale->correlative ?? ''));
 
                 return [
-                    'value' => (string) ($data['id'] ?? ''),
+                    'value' => (string) $sale->id,
                     'label' => $number,
                 ];
             })
             ->values()
             ->toArray();
     }
-
-}    
+}

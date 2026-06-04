@@ -8,6 +8,7 @@ use App\Enums\Sunat\DocIdentityType;
 use App\Enums\Sunat\DocSunatType;
 use App\Enums\Sunat\OperationType;
 use App\Enums\Sunat\PaymentForm;
+use App\Livewire\Pages\Sale\CreateSaleDocumentPage;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\SaleDocument;
@@ -138,7 +139,7 @@ it('creates a credit note from the nota credito page', function () {
         ],
     ];
 
-    Livewire::test('pages::sale.create-nota-credito')
+    Livewire::test(CreateSaleDocumentPage::class, ['docSunatType' => DocSunatType::NOTA_CREDITO->value])
         ->set('sale.companyId', (string) $company->id)
         ->set('sale.affectedDocSunatType', DocSunatType::BOLETA->value)
         ->set('sale.clientId', (string) $client->id)
@@ -255,7 +256,7 @@ it('prefills the credit note page from an approved voucher', function () {
     ]);
 
     Livewire::withQueryParams(['affected' => (string) $affected->id])
-        ->test('pages::sale.create-nota-credito')
+        ->test(CreateSaleDocumentPage::class, ['docSunatType' => DocSunatType::NOTA_CREDITO->value])
         ->assertSet('sale.affectedSaleDocumentId', (string) $affected->id)
         ->assertSet('sale.affectedDocSunatType', DocSunatType::BOLETA->value)
         ->assertSet('sale.affectedSerie', 'B001')
@@ -293,7 +294,7 @@ it('searches clients based on affected doc type', function () {
         'is_active' => true,
     ]);
 
-    $component = Livewire::test('pages::sale.create-nota-credito')
+    $component = Livewire::test(CreateSaleDocumentPage::class, ['docSunatType' => DocSunatType::NOTA_CREDITO->value])
         ->set('sale.affectedDocSunatType', DocSunatType::BOLETA->value)
         ->call('searchClient', 'Juan');
 

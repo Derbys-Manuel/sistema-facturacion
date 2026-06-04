@@ -1,9 +1,11 @@
 <?php
 
+use App\Actions\Sales\SendSaleDocumentToSunatAction;
+use App\Enums\DocumentStatus;
 use App\Enums\Sunat\AffecType;
 use App\Enums\Sunat\DocIdentityType;
 use App\Enums\Sunat\DocSunatType;
-use App\Enums\DocumentStatus;
+use App\Livewire\Pages\Sale\CreateSaleDocumentPage;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\SaleDocument;
@@ -81,7 +83,7 @@ it('creates a sale document from the boleta page', function () {
         ],
     ];
 
-    Livewire::test('pages::sale.create-boleta')
+    Livewire::test(CreateSaleDocumentPage::class, ['docSunatType' => DocSunatType::BOLETA->value])
         ->set('sale.companyId', (string) $company->id)
         ->set('sale.clientId', (string) $client->id)
         ->set('items', $items)
@@ -178,7 +180,7 @@ it('marks the sale document as approved when SUNAT accepts', function () {
         ],
     ];
 
-    Livewire::test('pages::sale.create-boleta')
+    Livewire::test(CreateSaleDocumentPage::class, ['docSunatType' => DocSunatType::BOLETA->value])
         ->set('sale.companyId', (string) $company->id)
         ->set('sale.clientId', (string) $client->id)
         ->set('items', $items)
@@ -199,7 +201,7 @@ it('marks the sale document as approved when SUNAT accepts', function () {
     ]);
 });
 
-it('marks the sale document as rejected when SUNAT is unreachable', function () {
+it('keeps the sale document retryable when SUNAT is unreachable', function () {
     app()->instance(SunatService::class, new class extends SunatService
     {
         public function send(array $data, SaleDocument $sale): array
@@ -272,7 +274,7 @@ it('marks the sale document as rejected when SUNAT is unreachable', function () 
         ],
     ];
 
-    Livewire::test('pages::sale.create-boleta')
+    Livewire::test(CreateSaleDocumentPage::class, ['docSunatType' => DocSunatType::BOLETA->value])
         ->set('sale.companyId', (string) $company->id)
         ->set('sale.clientId', (string) $client->id)
         ->set('items', $items)
@@ -281,15 +283,15 @@ it('marks the sale document as rejected when SUNAT is unreachable', function () 
 
     $saleDocumentId = (string) SaleDocument::query()->value('id');
 
-    Livewire::test('send-modal', ['saleId' => $saleDocumentId])
-        ->call('sendSunat')
-        ->assertHasNoErrors();
+    expect(
+        fn () => app(SendSaleDocumentToSunatAction::class)->handle($saleDocumentId),
+    )->toThrow(RuntimeException::class, 'Network error');
 
     $this->assertDatabaseHas('sale_documents', [
         'company_id' => $company->id,
         'client_id' => $client->id,
         'doc_sunat_type' => DocSunatType::BOLETA->value,
-        'status' => DocumentStatus::REJECTED->value,
+        'status' => DocumentStatus::DRAFT->value,
     ]);
 });
 
@@ -345,7 +347,7 @@ it('loads and updates a draft sale document from vouchers edit', function () {
         ],
     ];
 
-    Livewire::test('pages::sale.create-boleta')
+    Livewire::test(CreateSaleDocumentPage::class, ['docSunatType' => DocSunatType::BOLETA->value])
         ->set('sale.companyId', (string) $company->id)
         ->set('sale.clientId', (string) $client->id)
         ->set('items', $items)
@@ -374,7 +376,7 @@ it('loads and updates a draft sale document from vouchers edit', function () {
     ];
 
     Livewire::withQueryParams(['edit' => $saleId])
-        ->test('pages::sale.create-boleta')
+        ->test(CreateSaleDocumentPage::class, ['docSunatType' => DocSunatType::BOLETA->value])
         ->assertSet('editingSaleId', $saleId)
         ->set('sale.companyId', (string) $company->id)
         ->set('sale.clientId', (string) $client->id)

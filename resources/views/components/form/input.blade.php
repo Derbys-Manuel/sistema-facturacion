@@ -8,7 +8,7 @@
     'iconRight' => null,
     'textLeft' => null,
     'disabled' => false,
-    'size' => 'md',
+    'size' => 'sm',
     'wrapperClass' => null,
 
     'actionLeftIcon' => null,
@@ -28,13 +28,13 @@
 
 <div @class(['w-full', $wrapperClass])>
     @if ($label)
-        <flux:label class="mb-3 text-gray-700 text-sm">
+        <flux:label class="mb-1.5 text-xs text-gray-700">
             {{ $label }}
         </flux:label>
     @endif
 
     <div
-        class="group relative flex {{ $size === 'sm' ? 'h-9' : 'h-10' }} w-full items-center overflow-hidden rounded-sm border bg-white shadow-sm transition
+        class="group relative flex {{ $size === 'sm' ? 'h-8' : 'h-10' }} w-full items-center overflow-hidden rounded-sm border bg-white shadow-sm transition
         {{ $error
             ? 'border-red-400 ring-2 ring-red-100'
             : 'border-zinc-200 hover:border-zinc-300 focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-100' }}
@@ -88,7 +88,7 @@
             {{ $attributes->merge([
                 'type' => $type,
                 'class' =>
-                    'h-full w-full min-w-0 border-0 bg-transparent px-3 text-sm text-zinc-900 placeholder:text-zinc-400 outline-none ring-0 focus:ring-0 focus:outline-none disabled:cursor-not-allowed ' .
+                    'h-full w-full min-w-0 border-0 bg-transparent px-3 text-xs text-zinc-900 placeholder:text-zinc-400 outline-none ring-0 focus:ring-0 focus:outline-none disabled:cursor-not-allowed ' .
                     ($textLeft ? 'pl-1 ' : '') .
                     ($type === 'number'
                         ? 'appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
