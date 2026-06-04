@@ -2,26 +2,24 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Sales\GenerateSaleDocumentPdf;
 use App\Models\SaleDocument;
-use App\Services\SunatService;
 use Illuminate\Http\Response;
 
 class InvoiceController extends Controller
 {
-    public function pdf(string $saleId, SunatService $sunatService): Response
+    public function pdf(string $saleId, GenerateSaleDocumentPdf $generatePdf): Response
     {
         $sale = SaleDocument::query()
             ->with(['items', 'client', 'company', 'items.discounts'])
             ->findOrFail($saleId);
 
-        $data = $sale->toArray();
-        $sunatService->setLegends($data);
-        $document = $sunatService->getDocument($data, $sale);
-        $pdf = $sunatService->generatePdfReport($document, company: $sale->company, hash: $sale->hash);
+        $pdf = $generatePdf->handle($sale);
         $filename = sprintf('%s-%s.pdf', $sale->serie ?? 'N-A', $sale->correlative ?? 'N-A');
+
         return response($pdf, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+            'Content-Disposition' => 'inline; filename="'.$filename.'"',
         ]);
     }
 }

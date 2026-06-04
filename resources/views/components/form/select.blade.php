@@ -17,11 +17,49 @@
 
     'clearAfterSelect' => false,
     'keepOpenAfterSelect' => false,
+    'size' => 'sm'
 ])
 
 @php
     $wireModel = $attributes->wire('model');
     $shouldTriggerRequestOnChange = $wireModel->hasModifier('live');
+
+    $sizes = [
+        'xs' => [
+            'button' => 'h-7 px-2 text-[11px]',
+            'icon' => 'size-3',
+            'label' => 'mb-1 text-[11px]',
+            'option' => 'px-2 py-1 text-[11px]',
+            'search' => 'p-1',
+            'empty' => 'p-2 text-[11px]',
+        ],
+        'sm' => [
+            'button' => 'h-8 px-2.5 text-xs',
+            'icon' => 'size-3.5',
+            'label' => 'mb-1.5 text-xs',
+            'option' => 'px-2.5 py-1.5 text-xs',
+            'search' => 'p-1.5',
+            'empty' => 'p-3 text-xs',
+        ],
+        'md' => [
+            'button' => 'h-9 px-3 text-sm',
+            'icon' => 'size-4',
+            'label' => 'mb-2 text-sm',
+            'option' => 'px-3 py-2 text-sm',
+            'search' => 'p-2',
+            'empty' => 'p-4 text-sm',
+        ],
+        'lg' => [
+            'button' => 'h-11 px-3.5 text-sm',
+            'icon' => 'size-4',
+            'label' => 'mb-2 text-sm',
+            'option' => 'px-3.5 py-2.5 text-sm',
+            'search' => 'p-2.5',
+            'empty' => 'p-4 text-sm',
+        ],
+    ];
+
+    $ui = $sizes[$size] ?? $sizes['md'];
 @endphp
 
 <div
@@ -142,43 +180,56 @@
         }
     }"
 >
-    {{-- LABEL --}}
     @if($label)
-        <flux:label class="mb-3 text-gray-700 text-sm">
+        <flux:label class="{{ $ui['label'] }} font-medium text-zinc-700">
             {{ $label }}
         </flux:label>
     @endif
 
-    {{-- BOTÓN --}}
     <button
         type="button"
         x-on:click="toggle()"
-        class="flex h-10 w-full items-center gap-2 rounded-sm border bg-white px-3 text-sm shadow-sm transition
-        {{ $error ? 'border-red-400 ring-2 ring-red-100' : 'border-zinc-200 hover:border-zinc-300 focus:ring-emerald-100 focus:ring-2' }}"
+        @disabled($disabled)
+        class="group flex w-full items-center gap-2 rounded-sm bg-white text-left transition
+            {{ $ui['button'] }}
+            {{ $disabled ? 'cursor-not-allowed opacity-60' : 'hover:bg-white' }}
+            {{ $error ? 'ring-1 ring-red-300 bg-red-50' : 'ring-1 ring-zinc-200 focus:ring-2 focus:ring-emerald-100 focus:bg-white' }}"
     >
         @if($iconLeft)
-            <flux:icon :name="$iconLeft" class="size-4 text-zinc-400" />
+            <flux:icon :name="$iconLeft" class="{{ $ui['icon'] }} shrink-0 text-zinc-400" />
         @endif
 
         <span
-            class="flex-1 truncate text-left"
-            x-bind:class="selectedLabel ? 'text-zinc-900' : 'text-zinc-400'"
+            class="min-w-0 flex-1 truncate"
+            x-bind:class="selectedLabel ? 'text-zinc-800' : 'text-zinc-400'"
             x-text="selectedLabel || @js($placeholder)"
         ></span>
 
-        <flux:icon.chevron-down class="size-4 text-zinc-400" />
+        @if($clearable)
+            <span
+                x-show="selectedLabel"
+                x-cloak
+                x-on:click.stop="clear()"
+                class="rounded-sm p-0.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700"
+            >
+                <flux:icon.x-mark class="{{ $ui['icon'] }}" />
+            </span>
+        @endif
+
+        <flux:icon.chevron-down
+            class="{{ $ui['icon'] }} shrink-0 text-zinc-400 transition"
+            x-bind:class="open ? 'rotate-180' : ''"
+        />
     </button>
 
-    {{-- DROPDOWN --}}
     <div
         x-show="open"
         x-cloak
         x-transition
         x-on:click.outside="if (!keepOpenAfterSelect) close()"
-        class="absolute z-50 mt-1 w-full rounded-sm border bg-white shadow-lg"
+        class="absolute z-50 mt-1.5 w-full overflow-hidden rounded-sm bg-white shadow-lg ring-1 ring-zinc-200"
     >
-        {{-- SEARCH --}}
-        <div class="p-2 border-b">
+        <div class="{{ $ui['search'] }} border-b border-zinc-100 bg-white">
             <x-form.input
                 x-ref="search"
                 x-model="query"
@@ -188,25 +239,29 @@
             />
         </div>
 
-        {{-- LISTA --}}
-        <div class="max-h-64 overflow-y-auto">
+        <div class="max-h-60 overflow-y-auto py-1">
             @forelse($options as $option)
                 <button
                     type="button"
                     x-on:click="choose(@js($option['value']), @js($option['label']))"
-                    class="w-full px-3 py-2 text-left hover:bg-zinc-50 text-sm"
+                    class="w-full truncate text-left text-zinc-700 transition hover:bg-zinc-50 hover:text-zinc-950 {{ $ui['option'] }}"
                 >
                     {{ $option['label'] }}
                 </button>
             @empty
-                <div class="p-4 text-center text-sm text-zinc-400">
+                <div class="{{ $ui['empty'] }} text-center text-zinc-400">
                     Sin resultados
                 </div>
             @endforelse
         </div>
     </div>
 
-    {{-- ERROR --}}
+    @if($hint && !$error)
+        <p class="mt-1 text-xs text-zinc-400">
+            {{ $hint }}
+        </p>
+    @endif
+
     @if($error)
         <flux:error class="mt-1">
             {{ $error }}

@@ -1,9 +1,10 @@
 <?php
 
+use App\Enums\DocumentStatus;
 use App\Enums\Sunat\AffecType;
 use App\Enums\Sunat\DocIdentityType;
 use App\Enums\Sunat\DocSunatType;
-use App\Enums\DocumentStatus;
+use App\Livewire\Pages\Sale\CreateSaleDocumentPage;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\SaleDocument;
@@ -81,7 +82,7 @@ it('creates a sale document from the factura page', function () {
         ],
     ];
 
-    Livewire::test('pages::sale.create-factura')
+    Livewire::test(CreateSaleDocumentPage::class, ['docSunatType' => DocSunatType::FACTURA->value])
         ->set('sale.companyId', (string) $company->id)
         ->set('sale.clientId', (string) $client->id)
         ->set('items', $items)

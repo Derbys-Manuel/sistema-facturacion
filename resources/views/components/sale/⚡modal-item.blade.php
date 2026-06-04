@@ -288,7 +288,7 @@ new class extends Component
                             label="Descripción"
                             type="text"
                             size="sm"
-                            wire:model.live.debounce.300ms="saleItem.description"
+                            wire:model.defer="saleItem.description"
                             x-on:input.debounce.300ms="
                                 open = true;
                                 $wire.searchProduct($event.target.value);

@@ -1,6 +1,6 @@
 @props([
     'variant' => 'primary',
-    'size' => 'md',
+    'size' => 'sm',
     'loading' => false,
     'fullWidth' => false,
     'disabled' => false,
@@ -35,7 +35,7 @@
         $size === 'xs' ? 'h-7! px-2! text-xs!' : '',
         $size === 'md' ? 'h-10! px-4! text-sm!' : '',
         $size === 'lg' ? 'h-11! px-5! text-sm!' : '',
-        $size === 'icon' ? 'h-10! w-10! p-0!' : '',
+        $size === 'icon' ? 'h-8! w-8! p-0!' : '',
 
         $variant === 'primary' ? 'bg-primary! text-white! hover:brightness-110!' : '',
         $variant === 'secondary' ? 'bg-zinc-900! text-white! hover:bg-zinc-800!' : '',
@@ -55,14 +55,14 @@
     {{ $attributes->class($classes) }}
 >
     @if($loading)
-        <flux:icon.loading variant="micro" class="size-4 animate-spin" />
+        <flux:icon.loading variant="micro" @class(['animate-spin', $size === 'icon' ? 'size-3.5' : 'size-4']) />
     @elseif($leftIcon)
-        <flux:icon :name="$leftIcon" variant="micro" class="size-4" />
+        <flux:icon :name="$leftIcon" variant="micro" @class([$size === 'icon' ? 'size-3.5' : 'size-4']) />
     @endif
 
     {{ $slot }}
 
     @if(!$loading && $rightIcon)
-        <flux:icon :name="$rightIcon" variant="micro" class="size-4" />
+        <flux:icon :name="$rightIcon" variant="micro" @class([$size === 'icon' ? 'size-3.5' : 'size-4']) />
     @endif
 </flux:button>

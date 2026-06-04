@@ -255,13 +255,11 @@ new class extends Component
         SaleDocument::where('id', $id)->update([
             'sunat_state'=> false
         ]);
-        $this->mount();
     }
     public function restore(string $id){
         SaleDocument::where('id', $id)->update([
             'sunat_state'=> true
         ]);
-        $this->mount();
     }
     public function startNewInvoice(): void
     {
@@ -276,7 +274,6 @@ new class extends Component
     }
     #[On('closed-modal-send')]
     public function closeModalSend(){
-        $this->mount();    
     }
 };
 ?>

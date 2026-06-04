@@ -10,9 +10,9 @@ class SerieService
         string $docSunatType,
         string $companyId,
         ?string $affectedDocSunatType = null,
-    ): Serie
-    {
-        return Serie::query()
+    ): Serie {
+        /** @var Serie $serie */
+        $serie = Serie::query()
             ->where('doc_sunat_type', $docSunatType)
             ->when(
                 filled($affectedDocSunatType),
@@ -22,13 +22,17 @@ class SerieService
             ->where('is_active', true)
             ->lockForUpdate()
             ->firstOrFail();
+
+        return $serie;
     }
+
     public function nextCorrelative(string $current): string
     {
         $number = (int) $current;
         if ($number >= 999999999) {
             throw new \Exception('La serie llegó al correlativo máximo permitido.');
         }
+
         return str_pad((string) ($number + 1), 8, '0', STR_PAD_LEFT);
     }
 }
