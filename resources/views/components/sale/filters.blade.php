@@ -20,7 +20,7 @@
     >
         <button
             type="button"
-            class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-sm border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 sm:w-auto"
+            class="inline-flex h-8 w-full items-center justify-center gap-2 rounded-sm border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 sm:w-auto"
             x-on:click="open = ! open"
             x-bind:aria-expanded="open"
             aria-haspopup="dialog"
