@@ -501,7 +501,7 @@ new class extends Component
                                                 Nota de crédito
                                             </flux:menu.item>
                                         @endif
-                                        @if (in_array($rowStatus, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value], true))
+                                        @if (in_array($rowStatus, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value, DocumentStatus::WAITING->value], true))
                                         <flux:menu.item
                                             icon="pencil"
                                             wire:click="editSale('{{ $row['id'] }}', '{{ $row['docSunatType'] ?? '' }}')"
