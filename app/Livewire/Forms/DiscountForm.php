@@ -3,6 +3,7 @@
 namespace App\Livewire\Forms;
 
 use App\Models\Discount;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Validate;
 use Livewire\Form;
 
@@ -53,18 +54,28 @@ class DiscountForm extends Form
     public function store(array $discounts, ?string $saleDocumentId = null, ?string $saleDocumentItemId = null): void
     {
         $validatedDiscounts = $this->validateDiscounts($discounts);
+        $now = now();
+        $rows = [];
 
         foreach ($validatedDiscounts as $discount) {
-            Discount::create([
+            $rows[] = [
+                'id' => (string) Str::uuid(),
                 'type' => $discount['type'],
                 'base_amount' => $discount['baseAmount'],
                 'factor_porcentage' => $discount['factorPorcentage'],
                 'discount_amount' => $discount['discountAmount'],
                 'sale_document_id' => $saleDocumentId ?? null,
                 'sale_document_item_id' => $saleDocumentItemId ?? null,
-            ]);
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        if ($rows !== []) {
+            Discount::query()->insert($rows);
         }
     }
+
     public function validateDiscounts(array $discounts): array
     {
         $validatedDiscounts = [];
@@ -73,6 +84,7 @@ class DiscountForm extends Form
             $this->fill($discount);
             $validatedDiscounts[] = $this->validate();
         }
+
         return $validatedDiscounts;
     }
 }

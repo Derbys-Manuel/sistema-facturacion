@@ -25,6 +25,8 @@ new class extends Component
     public bool $pdfPreviewOpen = false;
     public ?string $pdfPreviewUrl = null;
     public ?string $sendSaleId = null;
+    /** @var array<string, string> */
+    public array $queuedSaleStatuses = [];
 
     public function setCompany(?string $companyId = null): void
     {
@@ -139,6 +141,7 @@ new class extends Component
     {
         return match ($status) {
             'aprobada' => 'emerald',
+            'esperando' => 'sky',
             'rechazada' => 'red',
             'observada' => 'amber',
             default => 'zinc',
@@ -272,8 +275,42 @@ new class extends Component
         $this->closePdfPreview();
         $this->redirectRoute('vouchers', navigate: true);
     }
+
+    public function displayStatus(array $row): ?string
+    {
+        $currentStatus = $row['status'] ?? null;
+        $queuedStatus = $this->queuedSaleStatuses[$row['id'] ?? ''] ?? null;
+
+        if (
+            $queuedStatus === DocumentStatus::WAITING->value
+            && in_array($currentStatus, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value], true)
+        ) {
+            return $queuedStatus;
+        }
+
+        return $currentStatus;
+    }
+
+    public function hasWaitingStatus(array $row): bool
+    {
+        return $this->displayStatus($row) === DocumentStatus::WAITING->value;
+    }
+
+    #[On('sale-document-queued')]
+    public function saleDocumentQueued(string $saleId): void
+    {
+        if (filled($saleId)) {
+            $this->queuedSaleStatuses[$saleId] = DocumentStatus::WAITING->value;
+            $this->sendSaleId = null;
+        }
+    }
+
     #[On('closed-modal-send')]
-    public function closeModalSend(){
+    public function closeModalSend(?string $saleId = null): void
+    {
+        if (filled($saleId)) {
+            $this->saleDocumentQueued($saleId);
+        }
     }
 };
 ?>
@@ -293,6 +330,7 @@ new class extends Component
     <div>
         @php($documents = $this->documents)
         @php($summary = $this->summary)
+        @php($hasWaitingDocuments = collect($documents['data'] ?? [])->contains(fn ($row) => $this->hasWaitingStatus($row)))
         <div class="mb-4 mx-auto w-full max-w-2xl grid grid-cols-1 gap-3 sm:grid-cols-3">
             <x-card-total
                 wire:key="summary-sale-value-{{ number_format((float) ($summary['saleValue'] ?? 0), 2, '.', '') }}"
@@ -341,7 +379,7 @@ new class extends Component
                 </flux:field>
             </div>
         </div>
-        <div class="relative">
+        <div class="relative" @if($hasWaitingDocuments) wire:poll.3s @endif>
             <div
                 wire:loading.flex
                 wire:target="from,to,q,docSunatType,deletedBool,companyId,nextPage,previousPage,setCompany,resetFilters"
@@ -354,6 +392,7 @@ new class extends Component
             </div>
              <x-ui.table :columns="['Fecha', 'Documento', 'Cliente', 'Tipo', 'Total', 'Estado', 'Acciones']" striped>
                 @forelse ($documents['data'] as $row)
+                    @php($rowStatus = $this->displayStatus($row))
                     <tr class="transition-colors hover:bg-zinc-50 font-mono text-xs" wire:key="sale-document-{{ $row['id'] }}">
                         <x-ui.table.cell>
                             {{ $row['dateIssue'] ? Carbon::parse($row['dateIssue'])->format('d-m-Y H:i') : '-' }}
@@ -382,8 +421,8 @@ new class extends Component
                         <x-ui.table.cell>
                             <flux:tooltip toggleable>
                                 <button type="button" class="inline-flex cursor-pointer">
-                                    <flux:badge :color="$this->statusBadgeColor($row['status'] ?? null)">
-                                        {{ $row['status'] ?? '-' }}
+                                    <flux:badge :color="$this->statusBadgeColor($rowStatus)">
+                                        {{ $rowStatus ?? '-' }}
                                     </flux:badge>
                                 </button>
                                 <flux:tooltip.content class="max-w-[22rem] space-y-2 text-xs">
@@ -450,7 +489,7 @@ new class extends Component
                                         Duplicar
                                     </flux:menu.item>
                                         @if (
-                                            ($row['status'] ?? null) === DocumentStatus::APPROVED->value
+                                            $rowStatus === DocumentStatus::APPROVED->value
                                             && in_array($row['docSunatType'] ?? null, [DocSunatType::BOLETA->value, DocSunatType::FACTURA->value], true)
                                         )
                                             <flux:menu.item
@@ -462,7 +501,7 @@ new class extends Component
                                                 Nota de crédito
                                             </flux:menu.item>
                                         @endif
-                                        @if (in_array($row['status'] ?? null, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value], true))
+                                        @if (in_array($rowStatus, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value], true))
                                         <flux:menu.item
                                             icon="pencil"
                                             wire:click="editSale('{{ $row['id'] }}', '{{ $row['docSunatType'] ?? '' }}')"
@@ -472,7 +511,7 @@ new class extends Component
                                             Editar
                                         </flux:menu.item>
                                     @endif
-                                    @if ($row['status'] === DocumentStatus::DRAFT->value)
+                                    @if (in_array($rowStatus, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value], true))
                                         <flux:menu.item icon="paper-airplane"
                                         wire:click="confirmSend('{{ $row['id'] }}')"
                                         wire:loading.attr="disabled"
@@ -494,7 +533,7 @@ new class extends Component
                                             $row['sunatState'] === true
                                         )
                                         && data_get($cdr, 'success') === false ||
-                                        $row['status'] === DocumentStatus::DRAFT->value
+                                        $rowStatus === DocumentStatus::DRAFT->value
                                     )
                                         <flux:menu.item icon="trash" 
                                         wire:click="delete('{{ $row['id'] }}')"

@@ -3,41 +3,56 @@
 namespace App\Livewire\Forms;
 
 use App\Enums\Sunat\AffecType;
+use App\Models\Discount;
 use App\Models\SaleDocumentItem;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Validate;
 use Livewire\Form;
 
 class SaleItemForm extends Form
 {
-
     #[Validate('nullable')]
     public ?string $id = null;
+
     #[Validate('required')]
     public $igvAffectationType = AffecType::GRAVADO->value;
+
     #[Validate('required')]
     public $code;
+
     #[Validate('required')]
     public $description;
+
     #[Validate('required')]
     public $unit;
+
     #[Validate('required|numeric|min:0.01')]
     public $quantity = 1;
+
     #[Validate('required|numeric|min:0')]
     public $unitValue = 0;
+
     #[Validate('required|numeric|min:0')]
     public $itemValue = 0;
+
     #[Validate('required|numeric|min:0.01')]
     public $unitPrice = 0;
+
     #[Validate('required')]
     public $igvBaseAmount = 0;
+
     #[Validate('required|numeric|min:0')]
     public $igvPercent = 18;
+
     #[Validate('required|numeric|min:0')]
     public $igvAmount = 0;
+
     #[Validate('required|numeric|min:0')]
     public $totalTaxes = 0;
+
     #[Validate('nullable|array')]
     public ?array $discounts = null;
+
     #[Validate('nullable')]
     public $total = null;
 
@@ -65,6 +80,7 @@ class SaleItemForm extends Form
             'totalTaxes.numeric' => 'El total de impuestos debe ser numérico.',
         ];
     }
+
     public function validationAttributes(): array
     {
         return [
@@ -83,12 +99,18 @@ class SaleItemForm extends Form
             'discounts' => 'descuentos',
         ];
     }
+
     public function store(array $items, string $docId, ?DiscountForm $discountForm = null): array
     {
         $validatedItems = $this->validateItems($items);
-        $createdItems = [];
+        $now = now();
+        $itemRows = [];
+        $discountRows = [];
+
         foreach ($validatedItems as $item) {
-            $createdItem = SaleDocumentItem::create([
+            $itemId = (string) Str::uuid();
+            $itemRows[] = [
+                'id' => $itemId,
                 'sale_document_id' => $docId,
                 'igv_affectation_type' => $item['igvAffectationType'],
                 'code' => $item['code'],
@@ -102,23 +124,50 @@ class SaleItemForm extends Form
                 'igv_percent' => $item['igvPercent'],
                 'igv_amount' => $item['igvAmount'],
                 'total_taxes' => $item['totalTaxes'],
-            ]);
+                'is_active' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+
             $itemDiscounts = $item['discounts'] ?? null;
             if (
                 $discountForm
                 && is_array($itemDiscounts)
                 && collect($itemDiscounts)->contains(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)
             ) {
-                $discountForm->store(
-                    discounts: $itemDiscounts,
-                    saleDocumentId: null,
-                    saleDocumentItemId: (string) $createdItem->id
-                );
+                foreach ($discountForm->validateDiscounts($itemDiscounts) as $discount) {
+                    if ((float) ($discount['discountAmount'] ?? 0) <= 0) {
+                        continue;
+                    }
+
+                    $discountRows[] = [
+                        'id' => (string) Str::uuid(),
+                        'type' => $discount['type'],
+                        'base_amount' => $discount['baseAmount'],
+                        'factor_porcentage' => $discount['factorPorcentage'],
+                        'discount_amount' => $discount['discountAmount'],
+                        'sale_document_id' => null,
+                        'sale_document_item_id' => $itemId,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
             }
-            $createdItems[] = $createdItem->toArray();
         }
-        return $createdItems;
+
+        if ($itemRows !== []) {
+            SaleDocumentItem::query()->insert($itemRows);
+        }
+
+        if ($discountRows !== []) {
+            Discount::query()->insert($discountRows);
+        }
+
+        return collect($itemRows)
+            ->map(fn (array $item): array => (new SaleDocumentItem)->forceFill($item)->toArray())
+            ->all();
     }
+
     public function validateItems(array $items): array
     {
         $validatedItems = [];
@@ -127,6 +176,7 @@ class SaleItemForm extends Form
             $this->fill($item);
             $validatedItems[] = $this->validate();
         }
+
         return $validatedItems;
     }
 }

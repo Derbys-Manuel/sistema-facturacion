@@ -26,6 +26,10 @@ class SendSaleDocumentToSunatAction
             return ['sunat' => ['success' => true, 'alreadyApproved' => true]];
         }
 
+        if (! in_array($sale->status, [DocumentStatus::DRAFT, DocumentStatus::REJECTED, DocumentStatus::WAITING], true)) {
+            return ['sunat' => ['success' => false, 'skipped' => true]];
+        }
+
         $data = $sale->toArray();
         $data['discounts'] = $this->activeDiscounts($data['discounts'] ?? []);
         $data['items'] = collect($this->saleService->hydrateItemsForSunatFromDatabase($data['items'] ?? []))

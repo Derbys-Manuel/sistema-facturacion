@@ -7,6 +7,7 @@ it('defines a portable and supervised queue worker', function (): void {
         ->toContain('process.env.APP_PATH')
         ->toContain('process.env.PHP_BINARY')
         ->toContain('queue:work database')
+        ->toContain("script: isWindows ? 'cmd.exe' : phpBinary")
         ->toContain("interpreter: 'none'")
         ->toContain('autorestart: true')
         ->toContain("max_memory_restart: '256M'");

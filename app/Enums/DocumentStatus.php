@@ -1,9 +1,11 @@
 <?php
+
 namespace App\Enums;
 
 enum DocumentStatus: string
 {
     case DRAFT = 'borrador';
+    case WAITING = 'esperando';
     case APPROVED = 'aprobada';
     case OBSERVED = 'observada';
     case REJECTED = 'rechazada';
@@ -13,4 +15,3 @@ enum DocumentStatus: string
         return array_column(self::cases(), 'value');
     }
 }
-

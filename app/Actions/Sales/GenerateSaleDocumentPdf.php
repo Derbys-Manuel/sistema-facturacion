@@ -14,7 +14,7 @@ class GenerateSaleDocumentPdf
 
     public function __construct(private SunatService $sunatService) {}
 
-    public function handle(SaleDocument $sale): string
+    public static function pathFor(SaleDocument $sale): string
     {
         $fingerprint = hash('sha256', implode('|', [
             self::RENDER_VERSION,
@@ -22,7 +22,13 @@ class GenerateSaleDocumentPdf
             $sale->updated_at?->toISOString(),
             $sale->hash,
         ]));
-        $path = "sale-documents/{$sale->id}/{$fingerprint}.pdf";
+
+        return "sale-documents/{$sale->id}/{$fingerprint}.pdf";
+    }
+
+    public function handle(SaleDocument $sale): string
+    {
+        $path = self::pathFor($sale);
 
         if (Storage::disk('local')->exists($path)) {
             return Storage::disk('local')->get($path);
