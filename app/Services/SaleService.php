@@ -12,10 +12,15 @@ use Brick\Math\RoundingMode;
 class SaleService
 {
     private const SCALE_UNIT = 5;
+
     private const SCALE_BASE = 5;
+
     private const SCALE_DISCOUNT = 2;
+
     private const SCALE_MONEY = 2;
+
     private const SCALE_FACTOR = 5;
+
     private const SCALE_CALC = 10;
 
     public function newDiscount(string $type = DiscountType::ITEM->value): array
@@ -186,6 +191,7 @@ class SaleService
             $discountRecalculateFrom
         );
     }
+
     public function hydrateItemsForSunatFromDatabase(array $items): array
     {
         return collect($items)
@@ -218,7 +224,11 @@ class SaleService
                 $calculated['totalTaxes'] = (string) ($item['totalTaxes'] ?? $calculated['totalTaxes']);
                 $calculated['taxesTotal'] = (string) ($item['taxesTotal'] ?? $calculated['taxesTotal']);
 
-                $calculated['total'] = (string) ($item['total'] ?? $calculated['total']);
+                $calculated['total'] = (string) ($item['total'] ?? $this->format(
+                    $this->bd($calculated['itemValue'] ?? '0')
+                        ->plus($this->bd($calculated['totalTaxes'] ?? $calculated['taxesTotal'] ?? '0')),
+                    self::SCALE_MONEY,
+                ));
                 $calculated['unitPriceWithDiscount'] = (string) ($item['unitPriceWithDiscount'] ?? $calculated['unitPriceWithDiscount']);
                 $calculated['totalWithoutDiscount'] = (string) ($item['totalWithoutDiscount'] ?? $calculated['totalWithoutDiscount']);
                 $calculated['discountAmount'] = (string) ($item['discountAmount'] ?? $calculated['discountAmount']);
@@ -232,12 +242,13 @@ class SaleService
                 //     $unitPriceWithDiscount = round($lineTotalWithTaxes / $quantity, 2);
                 //     $calculated['unitPriceWithDiscount'] = number_format($unitPriceWithDiscount, 2, '.', '');
                 // }
-                
+
                 return $calculated;
             })
             ->values()
             ->all();
     }
+
     public function calculateTotals(array $items): array
     {
         $totalTaxed = $this->sumWhere($items, 'igvAffectationType', AffecType::GRAVADO->value, 'itemValue', self::SCALE_BASE);

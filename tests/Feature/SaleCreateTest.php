@@ -399,3 +399,66 @@ it('loads and updates a draft sale document from vouchers edit', function () {
         'quantity' => 2,
     ]);
 });
+
+it('keeps existing line totals when loading a draft sale for edit', function () {
+    $company = Company::create([
+        'company_name' => 'Test Company SAC',
+        'ruc' => '20123456789',
+        'sol_user' => 'TEST',
+        'sol_pass' => 'TEST',
+        'department' => 'LIMA',
+        'province' => 'LIMA',
+        'district' => 'LIMA',
+    ]);
+
+    $sale = SaleDocument::create([
+        'document_type' => 'sale',
+        'ubl_version' => '2.1',
+        'doc_sunat_type' => DocSunatType::BOLETA->value,
+        'operation_type' => '0101',
+        'payment_form' => 'contado',
+        'currency' => 'PEN',
+        'serie' => 'B001',
+        'correlative' => '00000010',
+        'total_taxed' => 127.03,
+        'total_exempted' => 0,
+        'total_unaffected' => 0,
+        'total_export' => 0,
+        'total_free' => 0,
+        'total_igv' => 22.87,
+        'total_igv_free' => 0,
+        'icbper' => 0,
+        'total_taxes' => 22.87,
+        'sale_value' => 127.03,
+        'sub_total' => 149.90,
+        'total_sale' => 149.90,
+        'rounding' => 0,
+        'total' => 149.90,
+        'date_issue' => now('America/Lima'),
+        'date_expiration' => now('America/Lima'),
+        'status' => DocumentStatus::DRAFT->value,
+        'company_id' => $company->id,
+        'sunat_state' => true,
+    ]);
+
+    $sale->items()->create([
+        'code' => 'P149',
+        'description' => 'Producto 149.90',
+        'unit' => 'NIU',
+        'quantity' => 3,
+        'unit_value' => 42.34,
+        'unit_price' => 49.97,
+        'item_value' => 127.03,
+        'igv_affectation_type' => AffecType::GRAVADO->value,
+        'igv_base_amount' => 127.03,
+        'igv_percent' => 18,
+        'igv_amount' => 22.87,
+        'icbper_amount' => 0,
+        'total_taxes' => 22.87,
+    ]);
+
+    Livewire::withQueryParams(['edit' => (string) $sale->id])
+        ->test(CreateSaleDocumentPage::class, ['docSunatType' => DocSunatType::BOLETA->value])
+        ->assertSet('sale.total', '149.90')
+        ->assertSet('items.0.total', '149.90');
+});
