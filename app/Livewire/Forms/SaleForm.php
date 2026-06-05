@@ -8,7 +8,6 @@ use App\Enums\DocumentType;
 use App\Enums\Sunat\DocSunatType;
 use App\Enums\Sunat\OperationType;
 use App\Enums\Sunat\PaymentForm;
-use App\Jobs\GenerateSaleDocumentPdf;
 use App\Models\SaleDocument;
 use App\Services\SerieService;
 use Illuminate\Database\Eloquent\Builder;
@@ -264,8 +263,6 @@ class SaleForm extends Form
             })
             ->all();
 
-        GenerateSaleDocumentPdf::dispatch((string) $sale->id);
-
         return [
             'saleId' => (string) $sale->id,
             'pdfUrl' => route('sale.pdf', $sale->id),
@@ -348,8 +345,6 @@ class SaleForm extends Form
             return $sale->load('company', 'client');
         });
 
-        GenerateSaleDocumentPdf::dispatch((string) $sale->id);
-
         return [
             'saleId' => (string) $sale->id,
             'pdfUrl' => route('sale.pdf', $sale->id),
@@ -359,11 +354,6 @@ class SaleForm extends Form
     public function send(string $saleId, SendSaleDocumentToSunatAction $sendSaleDocumentToSunat): array
     {
         return $sendSaleDocumentToSunat->handle($saleId);
-    }
-
-    public function queuePdfGeneration(string $saleId): void
-    {
-        GenerateSaleDocumentPdf::dispatch($saleId);
     }
 
     public function list(

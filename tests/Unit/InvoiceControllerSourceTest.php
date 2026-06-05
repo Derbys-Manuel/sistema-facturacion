@@ -6,5 +6,7 @@ it('delegates pdf generation to the cached pdf action', function (): void {
     expect($source)
         ->toContain('GenerateSaleDocumentPdf')
         ->toContain('$generatePdf->handle($sale)')
+        ->not->toContain('GenerateSaleDocumentPdfJob')
+        ->not->toContain('sale.pdf-pending')
         ->not->toContain('generatePdfReport(');
 });
