@@ -1,16 +1,20 @@
 <?php
 
+use App\Enums\DocumentStatus;
 use App\Jobs\SendSaleDocumentToSunat;
+use App\Models\SaleDocument;
 use Flux\Flux;
 use Livewire\Component;
 
 new class extends Component
 {
     public ?string $saleId = null;
+
     public function mount(?string $saleId = null): void
     {
         $this->saleId = filled($saleId) ? $saleId : null;
     }
+
     public function close(): void
     {
         Flux::modal('confirm')->close();
@@ -21,21 +25,56 @@ new class extends Component
         if (blank($this->saleId)) {
             Flux::toast(
                 heading: 'Alerta',
-                text: 'No se encontró el comprobante para enviar',
+                text: 'No se encontro el comprobante para enviar',
                 variant: 'warning',
                 duration: 2500
             );
+
             return;
         }
+
+        $sale = SaleDocument::query()
+            ->select(['id', 'status'])
+            ->findOrFail($this->saleId);
+
+        if ($sale->status === DocumentStatus::WAITING) {
+            Flux::toast(
+                heading: 'SUNAT',
+                text: 'El comprobante ya esta esperando respuesta de SUNAT.',
+                variant: 'warning',
+                duration: 2500
+            );
+            $this->close();
+
+            return;
+        }
+
+        if (! in_array($sale->status, [DocumentStatus::DRAFT, DocumentStatus::REJECTED], true)) {
+            Flux::toast(
+                heading: 'SUNAT',
+                text: 'Este comprobante no esta disponible para envio.',
+                variant: 'warning',
+                duration: 2500
+            );
+            $this->close();
+
+            return;
+        }
+
+        $sale->update([
+            'status' => DocumentStatus::WAITING->value,
+        ]);
+
         SendSaleDocumentToSunat::dispatch($this->saleId);
 
         Flux::toast(
             heading: 'SUNAT',
-            text: 'El comprobante fue agregado a la cola de envío.',
+            text: 'El comprobante fue agregado a la cola de envio y queda esperando respuesta.',
             variant: 'success',
             duration: 3000
         );
-        $this->dispatch('closed-modal-send');
+        $this->dispatch('sale-document-queued', saleId: (string) $sale->id);
+        $this->dispatch('closed-modal-send', saleId: (string) $sale->id);
         $this->close();
     }
 };
@@ -50,7 +89,7 @@ new class extends Component
                 </div>
                 <div class="flex-1">
                     <h2 class="text-lg font-semibold text-zinc-800 mt-2">
-                        ¿Desea enviar comprobante a la SUNAT?                    
+                        Desea enviar comprobante a la SUNAT?
                     </h2>
                 </div>
             </div>
