@@ -230,7 +230,7 @@ class CreateSaleDocumentPage extends Component
             $this->selectedAffectedLabel = $this->sale->affectedSerie.'-'.$this->sale->affectedCorrelative;
         }
 
-        $saleService->applyTotals($this->sale, $this->items);
+        $this->fillSavedTotals($data);
     }
 
     public function editItem(int $index): void
@@ -433,7 +433,31 @@ class CreateSaleDocumentPage extends Component
             : [];
 
         $this->items = $saleService->hydrateItemsForSunatFromDatabase($data['items'] ?? []);
-        $saleService->applyTotals($this->sale, $this->items);
+        $this->fillSavedTotals($data);
+    }
+
+    private function fillSavedTotals(array $data): void
+    {
+        foreach ([
+            'totalTaxed',
+            'totalExempted',
+            'totalUnaffected',
+            'totalExport',
+            'totalFree',
+            'totalIgv',
+            'totalIgvFree',
+            'icbper',
+            'totalTaxes',
+            'saleValue',
+            'subTotal',
+            'totalSale',
+            'rounding',
+            'total',
+        ] as $key) {
+            if (array_key_exists($key, $data)) {
+                $this->sale->{$key} = $data[$key];
+            }
+        }
     }
 
     public function clearAffectedDocument(): void
