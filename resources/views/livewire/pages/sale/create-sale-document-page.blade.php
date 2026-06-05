@@ -27,7 +27,7 @@
         };
     @endphp
 
-    <div class="grid gap-4 grid-cols-[4fr_2.5fr] h-[88vh] overflow-auto scrollbar-thin-stable">
+    <div class="grid gap-4 grid-cols-[4fr_2.0fr] h-[88vh] overflow-auto scrollbar-thin-stable">
         <section class="flex flex-col overflow-auto rounded-sm bg-white scrollbar-thin-stable">
             <div class="space-y-3 mb-2">
                 <div class="flex justify-end">
