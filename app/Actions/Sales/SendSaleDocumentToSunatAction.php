@@ -5,6 +5,7 @@ namespace App\Actions\Sales;
 use App\Enums\DocumentStatus;
 use App\Enums\Sunat\DocSunatType;
 use App\Models\SaleDocument;
+use App\Services\SaleDocumentStatusCache;
 use App\Services\SaleService;
 use App\Services\SunatService;
 use RuntimeException;
@@ -14,6 +15,7 @@ class SendSaleDocumentToSunatAction
     public function __construct(
         private SunatService $sunatService,
         private SaleService $saleService,
+        private SaleDocumentStatusCache $statusCache,
     ) {}
 
     public function handle(string $saleId): array
@@ -23,10 +25,22 @@ class SendSaleDocumentToSunatAction
             ->findOrFail($saleId);
 
         if ($sale->status === DocumentStatus::APPROVED) {
+            $this->statusCache->put(
+                (string) $sale->id,
+                DocumentStatus::APPROVED,
+                is_array($sale->cdr) ? $sale->cdr : null,
+            );
+
             return ['sunat' => ['success' => true, 'alreadyApproved' => true]];
         }
 
         if (! in_array($sale->status, [DocumentStatus::DRAFT, DocumentStatus::REJECTED, DocumentStatus::WAITING], true)) {
+            $this->statusCache->put(
+                (string) $sale->id,
+                $sale->status,
+                is_array($sale->cdr) ? $sale->cdr : null,
+            );
+
             return ['sunat' => ['success' => false, 'skipped' => true]];
         }
 
@@ -54,14 +68,21 @@ class SendSaleDocumentToSunatAction
             );
         }
 
+        $status = $sunatSuccess
+            ? DocumentStatus::APPROVED
+            : DocumentStatus::REJECTED;
+
         $sale->update([
             'xml' => $response['xml'] ?? null,
             'hash' => $response['hash'] ?? null,
             'cdr' => $response['sunatResponse'] ?? null,
-            'status' => $sunatSuccess
-                ? DocumentStatus::APPROVED->value
-                : DocumentStatus::REJECTED->value,
+            'status' => $status->value,
         ]);
+        $this->statusCache->put(
+            (string) $sale->id,
+            $status,
+            $response['sunatResponse'] ?? null,
+        );
 
         return ['sunat' => $response];
     }

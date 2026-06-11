@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\SaleDocumentStatusController;
 use App\Livewire\Pages\Sale\CreateSaleDocumentPage;
 use Illuminate\Support\Facades\Route;
 
@@ -14,3 +15,4 @@ Route::livewire('/nota-credito', CreateSaleDocumentPage::class)->name('create-no
 Route::livewire('/comprobantes', 'pages::sale.vouchers')->name('vouchers');
 
 Route::get('/comprobantes/{saleId}/pdf', [InvoiceController::class, 'pdf'])->name('sale.pdf');
+Route::get('/comprobantes-estados', SaleDocumentStatusController::class)->name('sale.statuses');

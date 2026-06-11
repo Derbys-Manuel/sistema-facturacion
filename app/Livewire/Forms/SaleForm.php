@@ -229,7 +229,7 @@ class SaleForm extends Form
                 'company_id' => $data['companyId'] ?? null,
                 'client_id' => $data['clientId'] ?? null,
                 'sunat_state' => true,
-            ])->load('company', 'client');
+            ]);
             $saleDiscounts = $data['discounts'] ?? [];
             if (is_array($saleDiscounts) && collect($saleDiscounts)->contains(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)) {
                 $discountForm->store(
@@ -342,7 +342,7 @@ class SaleForm extends Form
             }
             $itemForm->store($data['items'], (string) $sale->id, $discountForm);
 
-            return $sale->load('company', 'client');
+            return $sale;
         });
 
         return [

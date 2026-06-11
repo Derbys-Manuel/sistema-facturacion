@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\CompanyCache;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -51,6 +52,17 @@ class Company extends BaseModel
         'province' => 'string',
         'district' => 'string',
     ];
+
+    protected static function booted(): void
+    {
+        static::saved(function (Company $company): void {
+            app(CompanyCache::class)->forget((string) $company->id);
+        });
+
+        static::deleted(function (Company $company): void {
+            app(CompanyCache::class)->forget((string) $company->id);
+        });
+    }
 
     public function saleDocuments(): HasMany
     {

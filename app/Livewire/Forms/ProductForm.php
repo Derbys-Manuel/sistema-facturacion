@@ -3,11 +3,15 @@
 namespace App\Livewire\Forms;
 
 use App\Models\Product;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Validate;
 use Livewire\Form;
 
 class ProductForm extends Form
 {
+    private const SEARCH_CACHE_KEY = 'products.search-list';
+
     #[Validate('nullable|string')]
     public ?string $id = null;
 
@@ -26,6 +30,7 @@ class ProductForm extends Form
     public function store(): array
     {
         $this->validate();
+
         $product = Product::create([
             'name' => $this->name,
             'unit' => $this->unit,
@@ -33,6 +38,8 @@ class ProductForm extends Form
             'price' => $this->price,
             'is_active' => true,
         ]);
+
+        $this->clearSearchCache();
 
         return $product->toArray();
     }
@@ -55,20 +62,54 @@ class ProductForm extends Form
             'price' => $this->price,
         ]);
 
+        $this->clearSearchCache();
+
         return $product;
     }
 
     public function search(string $q): array
     {
-        return Product::query()
-            ->select(['id', 'name', 'unit', 'sku'])
-            ->when($q, fn ($query) => $query->where(fn ($subQuery) => $subQuery->where('name', 'ilike', "%{$q}%")
-                ->orWhere('unit', 'ilike', "%{$q}%")
-                ->orWhere('sku', 'ilike', "%{$q}%")
-            )
-            )->limit(20)->get()->map(fn ($p) => [
-                'value' => (string) $p->id,
-                'label' => $p->name.' '.$p->unit.' '.$p->sku,
-            ])->toArray();
+        $q = trim($q);
+
+        if (mb_strlen($q) < 2) {
+            return [];
+        }
+
+        $products = Cache::rememberForever(self::SEARCH_CACHE_KEY, function () {
+            return Product::query()
+                ->select(['id', 'name', 'unit', 'sku', 'price'])
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get()
+                ->toArray();
+        });
+
+        $needle = $this->normalizeSearchText($q);
+
+        return collect($products)
+            ->filter(function (array $product) use ($needle) {
+                $name = $this->normalizeSearchText($product['name'] ?? '');
+                $sku = $this->normalizeSearchText($product['sku'] ?? '');
+
+                return Str::contains($name, $needle)
+                    || Str::contains($sku, $needle);
+            })
+            ->take(10)
+            ->values()
+            ->toArray();
+    }
+
+    private function clearSearchCache(): void
+    {
+        Cache::forget(self::SEARCH_CACHE_KEY);
+    }
+
+    private function normalizeSearchText(?string $value): string
+    {
+        return Str::of($value ?? '')
+            ->ascii()
+            ->lower()
+            ->trim()
+            ->toString();
     }
 }

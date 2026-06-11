@@ -24,10 +24,6 @@ new class extends Component
 
     public bool $pdfPreviewOpen = false;
     public ?string $pdfPreviewUrl = null;
-    public ?string $sendSaleId = null;
-    /** @var array<string, string> */
-    public array $queuedSaleStatuses = [];
-
     public function setCompany(?string $companyId = null): void
     {
         $this->companyId = filled($companyId) ? $companyId : null;
@@ -170,22 +166,6 @@ new class extends Component
         $this->openPdfPreview(route('sale.pdf', $saleId));
     }
 
-    public function confirmSend(?string $saleId = null): void
-    {
-        if (blank($saleId)) {
-            Flux::toast(
-                heading: 'Alerta',
-                text: 'No se encontró el comprobante para enviar',
-                variant: 'warning',
-                duration: 2500
-            );
-
-            return;
-        }
-        $this->sendSaleId = $saleId;
-        Flux::modal('confirm')->show();
-    }
-
     public function duplicateSale(string $saleId, ?string $docSunatType = null): void
     {
         $route = match ($docSunatType) {
@@ -278,46 +258,19 @@ new class extends Component
 
     public function displayStatus(array $row): ?string
     {
-        $currentStatus = $row['status'] ?? null;
-        $queuedStatus = $this->queuedSaleStatuses[$row['id'] ?? ''] ?? null;
-
-        if (
-            $queuedStatus === DocumentStatus::WAITING->value
-            && in_array($currentStatus, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value], true)
-        ) {
-            return $queuedStatus;
-        }
-
-        return $currentStatus;
+        return $row['status'] ?? null;
     }
 
     public function hasWaitingStatus(array $row): bool
     {
         return $this->displayStatus($row) === DocumentStatus::WAITING->value;
     }
-
-    #[On('sale-document-queued')]
-    public function saleDocumentQueued(string $saleId): void
-    {
-        if (filled($saleId)) {
-            $this->queuedSaleStatuses[$saleId] = DocumentStatus::WAITING->value;
-            $this->sendSaleId = null;
-        }
-    }
-
-    #[On('closed-modal-send')]
-    public function closeModalSend(?string $saleId = null): void
-    {
-        if (filled($saleId)) {
-            $this->saleDocumentQueued($saleId);
-        }
-    }
 };
 ?>
 <div class="relative">
     <div
         wire:loading.flex
-        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+        wire:target="duplicateSale,editSale,previewPdf,delete,restore,createCreditNote"
         class="fixed inset-0 z-[99999] hidden items-center justify-center bg-white/60 backdrop-blur-[1px]"
     >
         <div class="flex items-center gap-2 rounded-md bg-white px-4 py-3 shadow">
@@ -379,7 +332,65 @@ new class extends Component
                 </flux:field>
             </div>
         </div>
-        <div class="relative" @if($hasWaitingDocuments) wire:poll.3s @endif>
+        <div
+            class="relative"
+            x-data="{
+                waitingIds: @js(
+                    collect($documents['data'] ?? [])
+                        ->filter(fn ($row) => $this->hasWaitingStatus($row))
+                        ->pluck('id')
+                        ->values()
+                        ->all()
+                ),
+                endpoint: @js(route('sale.statuses')),
+                timer: null,
+
+                init() {
+                    this.timer = setInterval(() => this.refreshStatuses(), 60000)
+                },
+
+                addWaiting(saleId) {
+                    if (saleId && ! this.waitingIds.includes(saleId)) {
+                        this.waitingIds.push(saleId)
+                    }
+                },
+
+                async refreshStatuses() {
+                    if (this.waitingIds.length === 0) return
+
+                    const url = new URL(this.endpoint, window.location.origin)
+                    url.searchParams.set('ids', this.waitingIds.join(','))
+
+                    const response = await fetch(url, {
+                        headers: { Accept: 'application/json' },
+                        credentials: 'same-origin',
+                    })
+
+                    if (! response.ok) return
+
+                    const payload = await response.json()
+                    const statuses = payload.statuses ?? {}
+
+                    Object.entries(statuses).forEach(([saleId, data]) => {
+                        const status = data?.status
+                        if (! status) return
+
+                        window.dispatchEvent(new CustomEvent('sale-document-status-updated', {
+                            detail: {
+                                saleId,
+                                status,
+                                sunatResponse: data?.sunatResponse ?? null,
+                            },
+                        }))
+
+                        if (status !== @js(DocumentStatus::WAITING->value)) {
+                            this.waitingIds = this.waitingIds.filter((id) => id !== saleId)
+                        }
+                    })
+                },
+            }"
+            x-on:sale-document-queued.window="addWaiting($event.detail.saleId)"
+        >
             <div
                 wire:loading.flex
                 wire:target="from,to,q,docSunatType,deletedBool,companyId,nextPage,previousPage,setCompany,resetFilters"
@@ -393,7 +404,27 @@ new class extends Component
              <x-ui.table :columns="['Fecha', 'Documento', 'Cliente', 'Tipo', 'Total', 'Estado', 'Acciones']" striped>
                 @forelse ($documents['data'] as $row)
                     @php($rowStatus = $this->displayStatus($row))
-                    <tr class="transition-colors hover:bg-zinc-50 font-mono text-xs" wire:key="sale-document-{{ $row['id'] }}">
+                    @php($cdr = data_get($row, 'cdr'))
+                    <tr
+                        class="transition-colors hover:bg-zinc-50 font-mono text-xs"
+                        wire:key="sale-document-{{ $row['id'] }}"
+                        x-data="{
+                            status: @js($rowStatus),
+                            saleId: @js($row['id']),
+                            sunatResponse: @js($cdr),
+                        }"
+                        x-on:sale-document-queued.window="
+                            if ($event.detail.saleId === saleId) {
+                                status = @js(DocumentStatus::WAITING->value)
+                            }
+                        "
+                        x-on:sale-document-status-updated.window="
+                            if ($event.detail.saleId === saleId) {
+                                status = $event.detail.status
+                                sunatResponse = $event.detail.sunatResponse
+                            }
+                        "
+                    >
                         <x-ui.table.cell>
                             {{ $row['dateIssue'] ? Carbon::parse($row['dateIssue'])->format('d-m-Y H:i') : '-' }}
                         </x-ui.table.cell>
@@ -421,53 +452,54 @@ new class extends Component
                         <x-ui.table.cell>
                             <flux:tooltip toggleable>
                                 <button type="button" class="inline-flex cursor-pointer">
-                                    <flux:badge :color="$this->statusBadgeColor($rowStatus)">
-                                        {{ $rowStatus ?? '-' }}
-                                    </flux:badge>
+                                    <span
+                                        class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium"
+                                        x-bind:class="{
+                                            'bg-emerald-100 text-emerald-700': status === 'aprobada',
+                                            'bg-sky-100 text-sky-700': status === 'esperando',
+                                            'bg-red-100 text-red-700': status === 'rechazada',
+                                            'bg-amber-100 text-amber-700': status === 'observada',
+                                            'bg-zinc-100 text-zinc-700': ! ['aprobada', 'esperando', 'rechazada', 'observada'].includes(status),
+                                        }"
+                                        x-text="status ?? '-'"
+                                    ></span>
                                 </button>
                                 <flux:tooltip.content class="max-w-[22rem] space-y-2 text-xs">
-                                    @php($cdr = data_get($row, 'cdr'))
-                                    @if (is_array($cdr) && data_get($cdr, 'success') === true)
+                                    <div x-show="sunatResponse?.success === true" class="space-y-2">
                                         <p class="font-semibold text-white">SUNAT: Aceptado</p>
                                         <p class="text-white">
-                                            Código: {{ data_get($cdr, 'cdrResponse.code', '-') }}
+                                            Código:
+                                            <span x-text="sunatResponse?.cdrResponse?.code ?? '-'"></span>
                                         </p>
-                                        @php($notes = data_get($cdr, 'cdrResponse.notes'))
-                                        @if (is_array($notes) && count($notes))
-                                            <p class="text-white font-semibold">Notas:</p>
-                                            <ul class="list-disc pl-4 text-white">
-                                                @foreach ($notes as $note)
-                                                    <li>{{ $note }}</li>
-                                                @endforeach
-                                            </ul>
-                                        @else
-                                            <p class="text-white">Notas: -</p>
-                                        @endif
-                                        <p class="text-white">
-                                            {{ data_get($cdr, 'cdrResponse.description', '-') }}
+                                        <template x-if="Array.isArray(sunatResponse?.cdrResponse?.notes) && sunatResponse.cdrResponse.notes.length">
+                                            <div>
+                                                <p class="font-semibold text-white">Notas:</p>
+                                                <ul class="list-disc pl-4 text-white">
+                                                    <template x-for="note in sunatResponse.cdrResponse.notes" :key="note">
+                                                        <li x-text="note"></li>
+                                                    </template>
+                                                </ul>
+                                            </div>
+                                        </template>
+                                        <p
+                                            x-show="! Array.isArray(sunatResponse?.cdrResponse?.notes) || ! sunatResponse.cdrResponse.notes.length"
+                                            class="text-white"
+                                        >
+                                            Notas: -
                                         </p>
-                                    @elseif (is_array($cdr) && data_get($cdr, 'success') === false)
+                                        <p class="text-white" x-text="sunatResponse?.cdrResponse.description ?? '-'"></p>
+                                    </div>
+                                    <div x-show="sunatResponse?.success === false" class="space-y-2">
                                         <p class="font-semibold text-white">SUNAT: Rechazado (Editar unicamente cuando el codigo del error esta en este rango 0100-1999)</p>
                                         <p class="text-white">
-                                            Código: {{ data_get($cdr, 'error.code', '-') }}
+                                            Código:
+                                            <span x-text="sunatResponse?.error?.code ?? '-'"></span>
                                         </p>
-                                        @php($notes = data_get($cdr, 'cdrResponse.notes'))
-                                        @if (is_array($notes) && count($notes))
-                                            <p class="text-white font-semibold">Notas:</p>
-                                            <ul class="list-disc pl-4 text-white">
-                                                @foreach ($notes as $note)
-                                                    <li>{{ $note }}</li>
-                                                @endforeach
-                                            </ul>
-                                        @else
-                                            <p class="text-white">Notas: -</p>
-                                        @endif
-                                        <p class="text-white">
-                                            {{ data_get($cdr, 'error.message', '-') }}
-                                        </p>
-                                    @else
+                                        <p class="text-white" x-text="sunatResponse?.error?.message ?? '-'"></p>
+                                    </div>
+                                    <div x-show="! sunatResponse">
                                         <p class="text-white">Sin respuesta de SUNAT.</p>
-                                    @endif
+                                    </div>
                                 </flux:tooltip.content>
                             </flux:tooltip>
                         </x-ui.table.cell>
@@ -477,14 +509,14 @@ new class extends Component
                                     icon:trailing="ellipsis-horizontal"
                                     size="sm"
                                     wire:loading.attr="disabled"
-                                    wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                    wire:target="duplicateSale,editSale,previewPdf,delete,restore,createCreditNote"
                                 />                            
                                 <flux:menu>
                                     <flux:menu.item
                                         icon="document-duplicate"
                                         wire:click="duplicateSale('{{ $row['id'] }}', '{{ $row['docSunatType'] ?? '' }}')"
                                         wire:loading.attr="disabled"
-                                        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"    
+                                        wire:target="duplicateSale,editSale,previewPdf,delete,restore,createCreditNote"
                                     >
                                         Duplicar
                                     </flux:menu.item>
@@ -496,7 +528,7 @@ new class extends Component
                                                 icon="document-text"
                                                 wire:click="createCreditNote('{{ $row['id'] }}')"
                                                 wire:loading.attr="disabled"
-                                                wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                                wire:target="duplicateSale,editSale,previewPdf,delete,restore,createCreditNote"
                                             >
                                                 Nota de crédito
                                             </flux:menu.item>
@@ -506,16 +538,15 @@ new class extends Component
                                             icon="pencil"
                                             wire:click="editSale('{{ $row['id'] }}', '{{ $row['docSunatType'] ?? '' }}')"
                                             wire:loading.attr="disabled"
-                                            wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                            wire:target="duplicateSale,editSale,previewPdf,delete,restore,createCreditNote"
                                         >
                                             Editar
                                         </flux:menu.item>
                                     @endif
                                     @if (in_array($rowStatus, [DocumentStatus::DRAFT->value, DocumentStatus::REJECTED->value], true))
                                         <flux:menu.item icon="paper-airplane"
-                                        wire:click="confirmSend('{{ $row['id'] }}')"
-                                        wire:loading.attr="disabled"
-                                        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                        x-on:click="$wire.$dispatchTo('send-modal', 'open-send-modal', { saleId: '{{ $row['id'] }}' })"
+                                        x-show="status !== @js(DocumentStatus::WAITING->value)"
                                         >
                                             Enviar a sunat
                                         </flux:menu.item>
@@ -523,7 +554,7 @@ new class extends Component
                                     <flux:menu.item icon="document-magnifying-glass"
                                     wire:click="previewPdf('{{ $row['id'] }}')"
                                     wire:loading.attr="disabled"
-                                    wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                    wire:target="duplicateSale,editSale,previewPdf,delete,restore,createCreditNote"
                                     >
                                         Abrir pdf
                                     </flux:menu.item>
@@ -538,7 +569,7 @@ new class extends Component
                                         <flux:menu.item icon="trash" 
                                         wire:click="delete('{{ $row['id'] }}')"
                                         wire:loading.attr="disabled"
-                                        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote"
+                                        wire:target="duplicateSale,editSale,previewPdf,delete,restore,createCreditNote"
                                         >
                                             Eliminar
                                         </flux:menu.item>
@@ -547,7 +578,7 @@ new class extends Component
                                         <flux:menu.item icon="arrow-path" 
                                         wire:click="restore('{{ $row['id'] }}')"
                                         wire:loading.attr="disabled"
-                                        wire:target="duplicateSale,editSale,confirmSend,previewPdf,delete,restore,createCreditNote">
+                                        wire:target="duplicateSale,editSale,previewPdf,delete,restore,createCreditNote">
                                             Restaurar
                                         </flux:menu.item>
                                     @endif
@@ -597,7 +628,7 @@ new class extends Component
             :show-footer-actions="false"
         />
     
-        <livewire:send-modal :sale-id="$sendSaleId" :key="'send-modal-'.($sendSaleId ?? 'none')" />
+        <livewire:send-modal />
     </div>
 </div>
 @script
