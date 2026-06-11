@@ -15,6 +15,7 @@ new class extends Component
 
 
     public array $products = [];
+    public array $productList = [];
     public bool $calculating = false;
     public ?int $editingIndex = null;
 
@@ -36,6 +37,11 @@ new class extends Component
         $this->saleItem->unitPrice = $item['unitPrice'] ?? 0;
         $this->saleItem->unitValue = $item['unitValue'] ?? 0;
         $this->saleItem->total = $item['total'] ?? 0;
+        $this->saleItem->sumTotal = $item['totalWithoutDiscount']
+            ?? ((float) $this->saleItem->quantity * (float) $this->saleItem->unitPrice);
+        $this->saleItem->desiredTotal = data_get($item, 'discounts.0.discountAmount', 0) > 0
+            ? ($item['total'] ?? 0)
+            : null;
         $this->saleItem->igv = $item['igv'] ?? 0;
         $this->saleItem->igvPercent = $item['igvPercent'] ?? 18;
         $this->saleItem->igvAffectationType = $item['igvAffectationType'] ?? '10';
@@ -44,38 +50,26 @@ new class extends Component
 
     public function searchProduct(string $q = ''): void
     {
-        $this->products = $this->product->search($q);
+        $this->productList = $this->product->search($q);
+        $this->products = array_map(fn ($p) => [
+            'value' => (string) $p['id'],
+            'label' => $p['name'].' '.$p['unit'].' '.$p['sku'],
+            'item' => $p,
+        ], $this->productList);
     }
 
-    public function selectProduct(?string $id, ?string $label): void
+    public function selectProduct(?array $item): void
     {
-        if (blank($id)) {
-            return;
-        }
-
-        $record = $this->product->getRecord($id);
-
-        if (! $record) {
-            return;
-        }
-
-        $this->saleItem->id = $id;
-        $this->saleItem->description = $record->name;
-        $this->saleItem->code = $record->sku ?? '00000';
-        $this->saleItem->unit = $record->unit ?? 'NIU';
+        $this->saleItem->id = $item['id'] ?? null;
+        $this->saleItem->description = $item['name'].' '.$item['unit'].' '.$item['sku'];
+        $this->saleItem->code = $item['sku'] ?? '00000';
+        $this->saleItem->unit = $item['unit'] ?? 'NIU';
         $this->saleItem->quantity = 1;
-        $this->saleItem->unitPrice = $record->price ?? 0;
+        $this->saleItem->unitPrice = $item['price'] ?? 0;
         $this->saleItem->igvPercent = 18;
         $this->saleItem->igvAffectationType = '10';
 
         $this->calculateFromPrice();
-
-        $this->products = [
-            [
-                'value' => $id,
-                'label' => $record->name,
-            ],
-        ];
     }
 
     public function updatedSaleItemQuantity(): void
@@ -88,7 +82,7 @@ new class extends Component
         $this->calculateFromPrice();
     }
 
-    public function updatedSaleItemTotal(): void
+    public function updatedSaleItemSumTotal(): void
     {
         $this->calculateFromTotal();
     }
@@ -102,7 +96,7 @@ new class extends Component
         try {
             $saleService = app(SaleService::class);
             $item = $saleService->calculateItem($this->itemPayload());
-            $this->syncCalculatedItem($item);
+            $this->syncCalculatedItem($item, syncDesiredTotal: false);
         } finally {
             $this->calculating = false;
         }
@@ -116,8 +110,30 @@ new class extends Component
         $this->calculating = true;
         try {
             $saleService = app(SaleService::class);
-            $item = $saleService->calculateItemFromTotal($this->itemPayload());
-            $this->syncCalculatedItem($item);
+            $item = $saleService->calculateItemFromTotal(array_merge(
+                $this->itemPayload(),
+                ['total' => $this->saleItem->sumTotal ?? 0],
+            ));
+            $this->syncCalculatedItem($item, syncDesiredTotal: false);
+        } finally {
+            $this->calculating = false;
+        }
+    }
+
+    public function calculateFromDesiredTotal(): void
+    {
+        if ($this->calculating) {
+            return;
+        }
+
+        $this->calculating = true;
+        try {
+            $saleService = app(SaleService::class);
+            $item = $saleService->calculateItemFromDesiredTotal(
+                $this->itemPayload(),
+                $this->saleItem->desiredTotal,
+            );
+            $this->syncCalculatedItem($item, syncDesiredTotal: true);
         } finally {
             $this->calculating = false;
         }
@@ -132,7 +148,7 @@ new class extends Component
             null,
             'amount'
         );
-        $this->syncCalculatedItem($item);
+        $this->syncCalculatedItem($item, syncDesiredTotal: false);
     }
 
     public function calculateFromDiscountPercent(): void
@@ -144,7 +160,7 @@ new class extends Component
             null,
             'percent'
         );
-        $this->syncCalculatedItem($item);
+        $this->syncCalculatedItem($item, syncDesiredTotal: false);
     }
 
     private function itemPayload(): array
@@ -164,12 +180,16 @@ new class extends Component
         ];
     }
 
-    private function syncCalculatedItem(array $item): void
+    private function syncCalculatedItem(array $item, bool $syncDesiredTotal = false): void
     {
         $this->saleItem->quantity = $item['quantity'] ?? 1;
         $this->saleItem->unitPrice = $item['unitPrice'] ?? 0;
         $this->saleItem->unitValue = $item['unitValue'] ?? 0;
         $this->saleItem->total = $item['total'] ?? 0;
+        $this->saleItem->sumTotal = $item['totalWithoutDiscount'] ?? 0;
+        if ($syncDesiredTotal) {
+            $this->saleItem->desiredTotal = $item['total'] ?? null;
+        }
         $this->saleItem->igv = $item['igv'] ?? 0;
         $this->saleItem->discounts = $item['discounts'] ?? [];
     }
@@ -205,6 +225,8 @@ new class extends Component
         $this->saleItem->unitPrice = 0;
         $this->saleItem->unitValue = 0;
         $this->saleItem->total = 0;
+        $this->saleItem->sumTotal = 0;
+        $this->saleItem->desiredTotal = null;
         $this->saleItem->igv = 0;
         $this->saleItem->igvPercent = 18;
         $this->saleItem->igvAffectationType = '10';
@@ -233,7 +255,7 @@ new class extends Component
     }
 };
 ?>
-<div x-data class="mx-auto w-full max-w-xl overflow-hidden rounded-sm bg-white">
+<div x-data="{ showDiscounts: false }" class="mx-auto w-full max-w-xl overflow-hidden rounded-sm bg-white">
     <div class="relative bg-white">
         <div
             wire:loading.flex
@@ -312,8 +334,7 @@ new class extends Component
                                     class="w-full px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-emerald-50 hover:text-emerald-700"
                                     x-on:click="
                                         open = false;
-                                        $wire.selectProduct(@js($option['value']), @js($option['label']));
-                                    "
+                                        $wire.selectProduct(@js($option['item']));                                    "
                                 >
                                     {{ $option['label'] }}
                                 </button>
@@ -340,7 +361,7 @@ new class extends Component
                     <x-form.input
                         label="Cantidad"
                         type="number"
-                        step="0.01"
+                        step="0.00001"
                         min="0"
                         size="sm"
                         wire:model.live.blur="saleItem.quantity"
@@ -356,7 +377,7 @@ new class extends Component
                     <x-form.input
                         label="Precio unitario"
                         type="number"
-                        step="0.01"
+                        step="0.00001"
                         min="0"
                         size="sm"
                         wire:model.live.blur="saleItem.unitPrice"
@@ -372,20 +393,48 @@ new class extends Component
                     <x-form.input
                         label="Total"
                         type="number"
-                        step="0.01"
+                        step="0.00001"
                         min="0"
                         size="sm"
-                        wire:model.live.blur="saleItem.total"
+                        wire:model.live.blur="saleItem.sumTotal"
                         placeholder="0.00"
-                        :error="$errors->first('saleItem.total')"
+                        :error="$errors->first('saleItem.sumTotal')"
                     />
                 </div>
             </div>
-            <div class="space-y-3 rounded-sm bg-red-50/80 p-3">
-                <p class="text-xs font-semibold text-red-900">
-                    Descuento sobre la base imponible S/
-                    {{ number_format((float) data_get($saleItem->discounts, '0.baseAmount', 0), 2) }}
-                </p>
+            <label class="flex cursor-pointer items-center gap-2 text-xs font-medium text-zinc-600">
+                <input
+                    type="checkbox"
+                    x-model="showDiscounts"
+                    class="size-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <flux:icon.receipt-percent class="size-4 text-emerald-600" />
+                <span>Mostrar descuentos</span>
+            </label>
+            <div
+                x-show="showDiscounts"
+                x-cloak
+                x-transition.opacity.duration.150ms
+                class="space-y-3 rounded-sm bg-red-50/80 p-3"
+            >
+                <div
+                    class="transition-opacity duration-150"
+                    wire:loading.class="opacity-60"
+                    wire:target="calculateFromDesiredTotal"
+                >
+                    <x-form.input
+                        label="Total deseado"
+                        prefix="S/"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        size="sm"
+                        wire:model.blur="saleItem.desiredTotal"
+                        wire:blur="calculateFromDesiredTotal"
+                        placeholder="0.00"
+                        :error="$errors->first('saleItem.desiredTotal')"
+                    />
+                </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div
                         class="transition-opacity duration-150"

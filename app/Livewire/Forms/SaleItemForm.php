@@ -14,6 +14,9 @@ class SaleItemForm extends Form
     #[Validate('nullable')]
     public ?string $id = null;
 
+    #[Validate('nullable|numeric|min:0')]
+    public ?int $igv = 0;
+
     #[Validate('required')]
     public $igvAffectationType = AffecType::GRAVADO->value;
 
@@ -55,6 +58,12 @@ class SaleItemForm extends Form
 
     #[Validate('nullable')]
     public $total = null;
+
+    #[Validate('nullable')]
+    public $sumTotal = null;
+
+    #[Validate('nullable|numeric|min:0')]
+    public $desiredTotal = null;
 
     public function messages(): array
     {

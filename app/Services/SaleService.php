@@ -17,7 +17,7 @@ class SaleService
 
     private const SCALE_DISCOUNT = 2;
 
-    private const SCALE_MONEY = 2;
+    private const SCALE_MONEY = 5;
 
     private const SCALE_FACTOR = 5;
 
@@ -190,6 +190,85 @@ class SaleService
             null,
             $discountRecalculateFrom
         );
+    }
+
+    public function calculateItemFromDesiredTotal(array $item, string|int|float|null $desiredTotal): array
+    {
+        $calculated = $this->calculateItem($item);
+        $grossTotal = $this->bd($calculated['totalWithoutDiscount'] ?? '0')
+            ->toScale(self::SCALE_DISCOUNT, RoundingMode::HALF_UP);
+        $desiredTotal = $this->bd($desiredTotal)
+            ->toScale(self::SCALE_DISCOUNT, RoundingMode::HALF_UP);
+
+        if ($desiredTotal->isLessThan('0')) {
+            $desiredTotal = $this->bd('0');
+        }
+
+        if ($desiredTotal->isGreaterThan($grossTotal)) {
+            $desiredTotal = $grossTotal;
+        }
+
+        $igvAffectationType = (string) ($item['igvAffectationType'] ?? AffecType::GRAVADO->value);
+        $igvPercent = $this->bd($item['igvPercent'] ?? '18');
+        $grossBaseAmount = $this->bd($calculated['unitValue'] ?? '0')
+            ->multipliedBy($this->bd($calculated['quantity'] ?? '1'))
+            ->toScale(self::SCALE_DISCOUNT, RoundingMode::HALF_UP);
+
+        $itemValue = $igvAffectationType === AffecType::GRAVADO->value
+            ? $desiredTotal->dividedBy(
+                $this->taxFactor($igvPercent),
+                self::SCALE_DISCOUNT,
+                RoundingMode::HALF_UP,
+            )
+            : $desiredTotal;
+
+        $igvAmount = $igvAffectationType === AffecType::GRAVADO->value
+            ? $desiredTotal->minus($itemValue)->toScale(self::SCALE_DISCOUNT, RoundingMode::HALF_UP)
+            : $this->bd('0')->toScale(self::SCALE_DISCOUNT);
+
+        $discountAmount = $grossBaseAmount
+            ->minus($itemValue)
+            ->toScale(self::SCALE_DISCOUNT, RoundingMode::HALF_UP);
+
+        if ($discountAmount->isLessThan('0')) {
+            $discountAmount = $this->bd('0')->toScale(self::SCALE_DISCOUNT);
+        }
+
+        $factor = $grossBaseAmount->isGreaterThan('0')
+            ? $discountAmount->dividedBy($grossBaseAmount, self::SCALE_FACTOR, RoundingMode::HALF_UP)
+            : $this->bd('0')->toScale(self::SCALE_FACTOR);
+
+        $discount = [
+            'type' => DiscountType::ITEM->value,
+            'baseAmount' => $this->format($grossBaseAmount, self::SCALE_BASE),
+            'factorPorcentage' => $this->format($factor, self::SCALE_FACTOR),
+            'discountAmount' => $this->format($discountAmount, self::SCALE_DISCOUNT),
+            'uiPercent' => $this->format($factor->multipliedBy('100'), self::SCALE_MONEY),
+            'enabled' => true,
+            'mode' => 'amount',
+            'applyTo' => 'base',
+        ];
+
+        $quantity = $this->bd($calculated['quantity'] ?? '1');
+        $unitPriceWithDiscount = $quantity->isGreaterThan('0')
+            ? $desiredTotal->dividedBy($quantity, self::SCALE_MONEY, RoundingMode::HALF_UP)
+            : $this->bd('0')->toScale(self::SCALE_MONEY);
+
+        return array_merge($calculated, [
+            'saleValue' => $this->format($itemValue, self::SCALE_BASE),
+            'itemValue' => $this->format($itemValue, self::SCALE_BASE),
+            'total' => $this->format($desiredTotal, self::SCALE_MONEY),
+            'igv' => $this->format($igvAmount, self::SCALE_MONEY),
+            'igvBaseAmount' => $igvAffectationType === AffecType::GRAVADO->value
+                ? $this->format($itemValue, self::SCALE_BASE)
+                : $this->format($this->bd('0'), self::SCALE_BASE),
+            'igvAmount' => $this->format($igvAmount, self::SCALE_MONEY),
+            'totalTaxes' => $this->format($igvAmount, self::SCALE_MONEY),
+            'taxesTotal' => $this->format($igvAmount, self::SCALE_MONEY),
+            'discounts' => [$discount],
+            'discountAmount' => $this->format($discountAmount, self::SCALE_DISCOUNT),
+            'unitPriceWithDiscount' => $this->format($unitPriceWithDiscount, self::SCALE_MONEY),
+        ]);
     }
 
     public function hydrateItemsForSunatFromDatabase(array $items): array
@@ -423,7 +502,9 @@ class SaleService
 
     private function bd(string|int|float|null $value): BigDecimal
     {
-        return BigDecimal::of((string) ($value ?? '0'));
+        $value = trim((string) $value);
+
+        return BigDecimal::of($value === '' ? '0' : $value);
     }
 
     private function format(BigDecimal $value, int $scale): string

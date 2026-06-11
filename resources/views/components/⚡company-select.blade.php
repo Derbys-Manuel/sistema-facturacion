@@ -1,7 +1,7 @@
 <?php
 
 use Livewire\Component;
-use App\Models\Company;
+use App\Services\CompanyCache;
 
 new class extends Component
 {
@@ -9,23 +9,14 @@ new class extends Component
 
     public array $companies = [];
 
-    public function mount(): void
+    public function mount(CompanyCache $companyCache): void
     {
-        $this->loadCompanies();
+        $this->loadCompanies($companyCache);
     }
 
-    public function loadCompanies(): void
+    public function loadCompanies(CompanyCache $companyCache): void
     {
-        $this->companies = Company::query()
-            ->select('id', 'company_name', 'ruc')
-            ->get()
-            ->map(fn ($company) => [
-                'id' => $company->id,
-                'label' => $company->company_name,
-                'description' => $company->ruc,
-                'icon' => 'building-office',
-            ])
-            ->toArray();
+        $this->companies = $companyCache->selectorOptions();
     }
 };
 ?>

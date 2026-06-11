@@ -3,7 +3,9 @@
 use App\Enums\DocumentStatus;
 use App\Jobs\SendSaleDocumentToSunat;
 use App\Models\SaleDocument;
+use App\Services\SaleDocumentStatusCache;
 use Flux\Flux;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 new class extends Component
@@ -15,12 +17,19 @@ new class extends Component
         $this->saleId = filled($saleId) ? $saleId : null;
     }
 
+    #[On('open-send-modal')]
+    public function open(string $saleId): void
+    {
+        $this->saleId = $saleId;
+        Flux::modal('confirm')->show();
+    }
+
     public function close(): void
     {
         Flux::modal('confirm')->close();
     }
 
-    public function sendSunat(): void
+    public function sendSunat(SaleDocumentStatusCache $statusCache): void
     {
         if (blank($this->saleId)) {
             Flux::toast(
@@ -33,14 +42,20 @@ new class extends Component
             return;
         }
 
-        $sale = SaleDocument::query()
-            ->select(['id', 'status'])
-            ->findOrFail($this->saleId);
+        $updated = SaleDocument::query()
+            ->whereKey($this->saleId)
+            ->whereIn('status', [
+                DocumentStatus::DRAFT->value,
+                DocumentStatus::REJECTED->value,
+            ])
+            ->update([
+                'status' => DocumentStatus::WAITING->value,
+            ]);
 
-        if ($sale->status === DocumentStatus::WAITING) {
+        if ($updated !== 1) {
             Flux::toast(
                 heading: 'SUNAT',
-                text: 'El comprobante ya esta esperando respuesta de SUNAT.',
+                text: 'Este comprobante ya fue enviado o no esta disponible para envio.',
                 variant: 'warning',
                 duration: 2500
             );
@@ -48,24 +63,9 @@ new class extends Component
 
             return;
         }
-
-        if (! in_array($sale->status, [DocumentStatus::DRAFT, DocumentStatus::REJECTED], true)) {
-            Flux::toast(
-                heading: 'SUNAT',
-                text: 'Este comprobante no esta disponible para envio.',
-                variant: 'warning',
-                duration: 2500
-            );
-            $this->close();
-
-            return;
-        }
-
-        $sale->update([
-            'status' => DocumentStatus::WAITING->value,
-        ]);
 
         SendSaleDocumentToSunat::dispatch($this->saleId);
+        $statusCache->put($this->saleId, DocumentStatus::WAITING);
 
         Flux::toast(
             heading: 'SUNAT',
@@ -73,8 +73,7 @@ new class extends Component
             variant: 'success',
             duration: 3000
         );
-        $this->dispatch('sale-document-queued', saleId: (string) $sale->id);
-        $this->dispatch('closed-modal-send', saleId: (string) $sale->id);
+        $this->dispatch('sale-document-queued', saleId: $this->saleId);
         $this->close();
     }
 };

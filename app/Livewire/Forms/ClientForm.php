@@ -6,10 +6,14 @@ use App\Enums\Sunat\DocIdentityType;
 use App\Models\Client;
 use App\Models\District;
 use App\Services\IdentityDiurvanService;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Livewire\Form;
 
 class ClientForm extends Form
 {
+    private const CLIENT_SEARCH_CACHE_KEY = 'clients.search-list';
+
     public $name = null;
 
     public $tradeName = null;
@@ -167,45 +171,91 @@ class ClientForm extends Form
             'is_active' => (bool) $this->isActive,
         ]);
 
+        Cache::forget(self::CLIENT_SEARCH_CACHE_KEY);
+
         return $client->toArray();
     }
 
     public function search($q)
     {
-        return Client::query()
+        $q = trim((string) $q);
+
+        return collect($this->getCachedClients())
             ->when(
                 filled($q),
-                fn ($query) => $query->where(fn ($subQuery) => $subQuery->where('name', 'like', "%{$q}%")
-                    ->orWhere('trade_name', 'ilike', "%{$q}%")
-                    ->orWhere('document_number', 'ilike', "%{$q}%")
-                )
+                fn ($collection) => $collection->filter(fn ($client) => $this->clientMatchesSearch($client, $q))
             )
-            ->limit(20)
-            ->get()
-            ->map(fn ($client) => [
-                'value' => (string) $client->id,
-                'label' => ($client->name ?: $client->trade_name).' - '.$client->document_number,
-            ])
+            ->take(20)
+            ->map(fn ($client) => $this->clientToOption($client))
+            ->values()
             ->toArray();
     }
 
     public function searchWithoutDni($q)
     {
-        return Client::query()
-            ->where('doc_identity_type', DocIdentityType::RUC->value)
+        $q = trim((string) $q);
+
+        return collect($this->getCachedClients())
+            ->filter(fn ($client) => ($client['docIdentityType'] ?? null) === DocIdentityType::RUC->value)
             ->when(
                 filled($q),
-                fn ($query) => $query->where(fn ($subQuery) => $subQuery->where('name', 'like', "%{$q}%")
-                    ->orWhere('trade_name', 'ilike', "%{$q}%")
-                    ->orWhere('document_number', 'ilike', "%{$q}%")
-                )
+                fn ($collection) => $collection->filter(fn ($client) => $this->clientMatchesSearch($client, $q))
             )
-            ->limit(20)
-            ->get()
-            ->map(fn ($client) => [
-                'value' => (string) $client->id,
-                'label' => ($client->name ?: $client->trade_name).' - '.$client->document_number,
-            ])
+            ->take(20)
+            ->map(fn ($client) => $this->clientToOption($client))
+            ->values()
             ->toArray();
+    }
+
+    private function getCachedClients(): array
+    {
+        return Cache::rememberForever(self::CLIENT_SEARCH_CACHE_KEY, function () {
+            return Client::query()
+                ->select([
+                    'id',
+                    'name',
+                    'trade_name',
+                    'doc_identity_type',
+                    'document_number',
+                ])
+                ->get()
+                ->toArray();
+        });
+    }
+
+    private function clientMatchesSearch(array $client, string $q): bool
+    {
+        $needle = $this->normalizeSearchText($q);
+
+        $name = $this->normalizeSearchText($client['name'] ?? '');
+        $tradeName = $this->normalizeSearchText($client['tradeName'] ?? '');
+        $documentNumber = $this->normalizeSearchText($client['documentNumber'] ?? '');
+
+        return Str::contains($name, $needle)
+            || Str::contains($tradeName, $needle)
+            || Str::contains($documentNumber, $needle);
+    }
+
+    private function clientToOption(array $client): array
+    {
+        $name = $client['name'] ?? null;
+        $tradeName = $client['tradeName'] ?? null;
+        $documentNumber = $client['documentNumber'] ?? '';
+
+        $labelName = $name ?: $tradeName ?: 'Sin nombre';
+
+        return [
+            'value' => (string) ($client['id'] ?? ''),
+            'label' => trim($labelName.' - '.$documentNumber),
+        ];
+    }
+
+    private function normalizeSearchText(?string $value): string
+    {
+        return Str::of($value ?? '')
+            ->ascii()
+            ->lower()
+            ->trim()
+            ->toString();
     }
 }

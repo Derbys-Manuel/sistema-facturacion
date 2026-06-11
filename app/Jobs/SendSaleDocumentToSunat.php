@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Sales\SendSaleDocumentToSunatAction;
 use App\Enums\DocumentStatus;
 use App\Models\SaleDocument;
+use App\Services\SaleDocumentStatusCache;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -39,18 +40,26 @@ class SendSaleDocumentToSunat implements ShouldBeUnique, ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        $sunatResponse = [
+            'success' => false,
+            'error' => [
+                'code' => 'QUEUE_FAILED',
+                'message' => $exception?->getMessage() ?? 'No se pudo procesar el envio a SUNAT.',
+            ],
+        ];
+
         SaleDocument::query()
             ->whereKey($this->saleId)
             ->where('status', DocumentStatus::WAITING->value)
             ->update([
                 'status' => DocumentStatus::REJECTED->value,
-                'cdr' => [
-                    'success' => false,
-                    'error' => [
-                        'code' => 'QUEUE_FAILED',
-                        'message' => $exception?->getMessage() ?? 'No se pudo procesar el envio a SUNAT.',
-                    ],
-                ],
+                'cdr' => $sunatResponse,
             ]);
+
+        app(SaleDocumentStatusCache::class)->put(
+            $this->saleId,
+            DocumentStatus::REJECTED,
+            $sunatResponse,
+        );
     }
 }
