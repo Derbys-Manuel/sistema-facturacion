@@ -330,16 +330,28 @@ class SaleService
 
     public function calculateTotals(array $items): array
     {
-        $totalTaxed = $this->sumWhere($items, 'igvAffectationType', AffecType::GRAVADO->value, 'itemValue', self::SCALE_BASE);
-        $totalExempted = $this->sumWhere($items, 'igvAffectationType', AffecType::EXONERADO->value, 'itemValue', self::SCALE_BASE);
-        $totalUnaffected = $this->sumWhere($items, 'igvAffectationType', AffecType::INAFECTO->value, 'itemValue', self::SCALE_BASE);
-        $totalFree = $this->sumWhere($items, 'igvAffectationType', AffecType::GRATUITO->value, 'itemValue', self::SCALE_BASE);
+        $totalTaxed = $this->fiscalAmount(
+            $this->sumWhere($items, 'igvAffectationType', AffecType::GRAVADO->value, 'itemValue', self::SCALE_BASE),
+        );
+        $totalExempted = $this->fiscalAmount(
+            $this->sumWhere($items, 'igvAffectationType', AffecType::EXONERADO->value, 'itemValue', self::SCALE_BASE),
+        );
+        $totalUnaffected = $this->fiscalAmount(
+            $this->sumWhere($items, 'igvAffectationType', AffecType::INAFECTO->value, 'itemValue', self::SCALE_BASE),
+        );
+        $totalFree = $this->fiscalAmount(
+            $this->sumWhere($items, 'igvAffectationType', AffecType::GRATUITO->value, 'itemValue', self::SCALE_BASE),
+        );
 
         $totalExport = $this->bd('0')->toScale(self::SCALE_BASE);
         $icbper = $this->bd('0')->toScale(self::SCALE_MONEY);
 
-        $totalIgv = $this->sumWhere($items, 'igvAffectationType', AffecType::GRAVADO->value, 'igvAmount', self::SCALE_MONEY);
-        $totalIgvFree = $this->sumWhere($items, 'igvAffectationType', AffecType::GRATUITO->value, 'igvAmount', self::SCALE_MONEY);
+        $totalIgv = $this->fiscalAmount(
+            $this->sumWhere($items, 'igvAffectationType', AffecType::GRAVADO->value, 'igvAmount', self::SCALE_MONEY),
+        );
+        $totalIgvFree = $this->fiscalAmount(
+            $this->sumWhere($items, 'igvAffectationType', AffecType::GRATUITO->value, 'igvAmount', self::SCALE_MONEY),
+        );
 
         $totalTaxes = $totalIgv->plus($icbper)->toScale(self::SCALE_MONEY, RoundingMode::HALF_UP);
 
@@ -491,6 +503,13 @@ class SaleService
         }
 
         return $total->toScale($scale, RoundingMode::HALF_UP);
+    }
+
+    private function fiscalAmount(BigDecimal $amount): BigDecimal
+    {
+        return $amount
+            ->toScale(self::SCALE_DISCOUNT, RoundingMode::HALF_UP)
+            ->toScale(self::SCALE_MONEY);
     }
 
     private function taxFactor(BigDecimal $igvPercent): BigDecimal
