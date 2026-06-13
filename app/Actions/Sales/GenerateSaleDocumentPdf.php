@@ -26,12 +26,22 @@ class GenerateSaleDocumentPdf
         return "sale-documents/{$sale->id}/{$fingerprint}.pdf";
     }
 
+    public function exists(SaleDocument $sale): bool
+    {
+        return Storage::disk('local')->exists(self::pathFor($sale));
+    }
+
+    public function get(SaleDocument $sale): string
+    {
+        return Storage::disk('local')->get(self::pathFor($sale));
+    }
+
     public function handle(SaleDocument $sale): string
     {
         $path = self::pathFor($sale);
 
-        if (Storage::disk('local')->exists($path)) {
-            return Storage::disk('local')->get($path);
+        if ($this->exists($sale)) {
+            return $this->get($sale);
         }
 
         $data = $sale->toArray();
