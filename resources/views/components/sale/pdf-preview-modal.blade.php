@@ -1,6 +1,7 @@
 @props([
     'open' => false,
     'url' => null,
+    'statusUrl' => null,
     'title' => 'PDF generado',
     'closeAction' => 'closePdfPreview',
     'newAction' => 'startNewInvoice',
@@ -8,18 +9,75 @@
     'listAction' => 'goToVouchers',
     'listLabel' => 'Ir a listado',
     'showFooterActions' => true,
-    'closedEvent' => 'pdf-modal-closed',
 ])
 
 @if ($open)
     <div
+        x-show="visible"
+        x-cloak
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
         x-data="{
+            visible: true,
             leaving: false,
-            closing: false,
-            
+            pdfUrl: null,
+            pdfStatus: '{{ filled($statusUrl) ? 'pending' : (filled($url) ? 'ready' : 'failed') }}',
+            pdfError: null,
+            pollAttempts: 0,
+            pollTimer: null,
+
+            init() {
+                if (this.pdfStatus === 'ready') {
+                    this.pdfUrl = @js($url);
+                    return;
+                }
+
+                if (@js($statusUrl)) {
+                    this.pollPdfStatus();
+                }
+            },
+
+            async pollPdfStatus() {
+                try {
+                    const response = await fetch(@js($statusUrl), {
+                        headers: { 'Accept': 'application/json' },
+                        credentials: 'same-origin',
+                    });
+
+                    if (! response.ok) {
+                        throw new Error('No se pudo consultar el estado del PDF.');
+                    }
+
+                    const data = await response.json();
+
+                    if (data.status === 'ready') {
+                        this.pdfStatus = 'ready';
+                        this.pdfUrl = data.url;
+                        return;
+                    }
+
+                    if (data.status === 'failed') {
+                        this.pdfStatus = 'failed';
+                        this.pdfError = data.message || 'No se pudo generar el PDF.';
+                        return;
+                    }
+
+                    this.pollAttempts++;
+                    if (this.pollAttempts >= 60) {
+                        this.pdfStatus = 'failed';
+                        this.pdfError = 'La generación del PDF excedió el tiempo de espera.';
+                        return;
+                    }
+
+                    this.pollTimer = setTimeout(() => this.pollPdfStatus(), 2000);
+                } catch (error) {
+                    this.pdfStatus = 'failed';
+                    this.pdfError = error.message;
+                }
+            },
+
             closeModal() {
-                this.$dispatch('{{ $closedEvent }}');
+                clearTimeout(this.pollTimer);
+                this.visible = false;
                 $wire.{{ $closeAction }}();
             }
         }"
@@ -37,38 +95,44 @@
                     variant="ghost"
                     size="sm"
                     type="button"
-                    x-on:click="closing = true; closeModal()"
-                    x-bind:disabled="closing"
+                    x-on:click="closeModal()"
                 >
-                    <span x-show="!closing" x-cloak>
-                        Cerrar
-                    </span>
-
-                    <span x-show="closing" x-cloak class="inline-flex items-center gap-2">
-                        <flux:icon.loading class="size-4 animate-spin" />
-                        <span>Cerrando...</span>
-                    </span>
+                    Cerrar
                 </x-form.button>
             </div>
 
             <div class="space-y-2 p-4">
                 <div class="overflow-hidden rounded-2xl border border-black/10 bg-white">
-                    @if ($url)
+                    @if ($url || $statusUrl)
                         <div x-data="{ loading: true }" class="relative">
                             <div
-                                x-show="loading"
+                                x-show="pdfStatus === 'pending'"
                                 x-cloak
                                 class="absolute inset-0 flex h-[60vh] items-center justify-center bg-white text-sm text-black/60"
                             >
-                                Cargando PDF...
+                                <div class="flex items-center gap-2">
+                                    <flux:icon.loading class="size-4 animate-spin" />
+                                    <span>Generando PDF...</span>
+                                </div>
                             </div>
 
                             <iframe
+                                x-show="pdfStatus === 'ready'"
+                                x-cloak
                                 title="pdf-preview"
-                                src="{{ $url }}"
+                                x-bind:src="pdfUrl"
                                 class="h-[74vh] w-full overflow-auto"
                                 @load="loading = false"
                             ></iframe>
+
+                            <div
+                                x-show="pdfStatus === 'failed'"
+                                x-cloak
+                                class="flex h-[60vh] flex-col items-center justify-center gap-2 px-6 text-center text-sm text-red-600"
+                            >
+                                <flux:icon.exclamation-triangle class="size-6" />
+                                <span x-text="pdfError || 'No se pudo generar el PDF.'"></span>
+                            </div>
                         </div>
                     @else
                         <div class="flex h-[60vh] items-center justify-center text-sm text-black/60">

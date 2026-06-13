@@ -1,5 +1,8 @@
 <?php
 
+use App\Jobs\GenerateSaleDocumentPdfJob;
+use App\Services\SaleDocumentPdfSnapshot;
+
 use App\Enums\Sunat\DocSunatType;
 use App\Enums\DocumentStatus;
 use App\Livewire\Forms\SaleForm;
@@ -24,6 +27,8 @@ new class extends Component
 
     public bool $pdfPreviewOpen = false;
     public ?string $pdfPreviewUrl = null;
+
+    public ?string $pdfStatusUrl = null;
     public function setCompany(?string $companyId = null): void
     {
         $this->companyId = filled($companyId) ? $companyId : null;
@@ -144,26 +149,38 @@ new class extends Component
         };
     }
 
-    public function openPdfPreview(?string $url = null): void
+    public function openPdfPreview(?string $url = null, ?string $statusUrl = null): void
     {
         $this->pdfPreviewUrl = filled($url) ? $url : null;
-        $this->pdfPreviewOpen = filled($this->pdfPreviewUrl);
+        $this->pdfStatusUrl = filled($statusUrl) ? $statusUrl : null;
+        $this->pdfPreviewOpen = filled($this->pdfPreviewUrl) || filled($this->pdfStatusUrl);
     }
 
     public function closePdfPreview(): void
     {
         $this->pdfPreviewOpen = false;
         $this->pdfPreviewUrl = null;
+        $this->pdfStatusUrl = null;
     }
 
-    public function previewPdf(?string $saleId = null): void
+    public function previewPdf(
+        ?string $saleId,
+        SaleDocumentPdfSnapshot $pdfSnapshot,
+    ): void
     {
         if (blank($saleId)) {
             $this->openPdfPreview(null);
 
             return;
         }
-        $this->openPdfPreview(route('sale.pdf', $saleId));
+
+        $snapshotPath = $pdfSnapshot->storeFromDatabase($saleId);
+
+        GenerateSaleDocumentPdfJob::dispatch($saleId, $snapshotPath);
+        $this->openPdfPreview(
+            route('sale.pdf', $saleId),
+            route('sale.pdf-status', $saleId),
+        );
     }
 
     public function duplicateSale(string $saleId, ?string $docSunatType = null): void
@@ -625,6 +642,7 @@ new class extends Component
         <x-sale.pdf-preview-modal
             :open="$pdfPreviewOpen"
             :url="$pdfPreviewUrl"
+            :status-url="$pdfStatusUrl"
             :show-footer-actions="false"
         />
     

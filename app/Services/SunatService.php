@@ -2,16 +2,17 @@
 
 namespace App\Services;
 
-use App\Enums\Sunat\DocSunatType;
 use App\Enums\Sunat\DocIdentityType;
-use Greenter\Model\Sale\Charge;
-use App\Models\SaleDocument;
+use App\Enums\Sunat\DocSunatType;
 use App\Models\Client as ClientModels;
 use App\Models\Company as CompanyModels;
+use App\Models\SaleDocument;
 use DateTime;
 use Greenter\Model\Client\Client;
 use Greenter\Model\Company\Address;
 use Greenter\Model\Company\Company;
+use Greenter\Model\DocumentInterface;
+use Greenter\Model\Sale\Charge;
 use Greenter\Model\Sale\FormaPagos\FormaPagoContado;
 use Greenter\Model\Sale\Invoice;
 use Greenter\Model\Sale\Legend;
@@ -20,10 +21,10 @@ use Greenter\Model\Sale\SaleDetail;
 use Greenter\Report\HtmlReport;
 use Greenter\Report\PdfReport;
 use Greenter\Report\Resolver\DefaultTemplateResolver;
+use Greenter\Report\XmlUtils;
 use Greenter\See;
 use Greenter\Ws\Services\SunatEndpoints;
 use Luecano\NumeroALetras\NumeroALetras;
-use Greenter\Report\XmlUtils;
 
 class SunatService
 {
@@ -36,6 +37,7 @@ class SunatService
             $result = $see->send($document);
             $xml = $see->getFactory()->getLastXml();
             $hash = (new XmlUtils)->getHashSign($xml);
+
             return [
                 'success' => true,
                 'xml' => $xml,
@@ -71,31 +73,33 @@ class SunatService
 
         return $this->getInvoice($data, $sale);
     }
+
     public function getSee(CompanyModels $company)
     {
         $certPath = storage_path($company->cert_path);
-        $see = new See();
+        $see = new See;
         $see->setBuilderOptions([
             'template_paths' => [
                 resource_path('templates/xml'),
             ],
         ]);
-        $see->setCertificate(file_get_contents($certPath));        
+        $see->setCertificate(file_get_contents($certPath));
         $see->setService($company->production ? SunatEndpoints::FE_PRODUCCION : SunatEndpoints::FE_BETA);
         $see->setClaveSOL($company->ruc, $company->sol_user, $company->sol_pass);
+
         return $see;
     }
 
     public function getInvoice($data, SaleDocument $sale)
     {
-        $invoice = (new Invoice())
+        $invoice = (new Invoice)
             ->setUblVersion($data['ublVersion'] ?? '2.1')
             ->setTipoOperacion($data['operationType'] ?? null) // Venta - Catalog. 51
-            ->setTipoDoc($data['docSunatType'] ?? null) // Factura - Catalog. 01 
+            ->setTipoDoc($data['docSunatType'] ?? null) // Factura - Catalog. 01
             ->setSerie($data['serie'] ?? null)
             ->setCorrelativo($data['correlative'] ?? null)
             ->setFechaEmision(new DateTime($data['dateIssue'] ?? null)) // Zona horaria: Lima
-            ->setFormaPago(new FormaPagoContado()) // FormaPago: Contado
+            ->setFormaPago(new FormaPagoContado) // FormaPago: Contado
             ->setTipoMoneda($data['currency'] ?? null) // Sol - Catalog. 02
             ->setCompany($this->getCompany($sale->company))
             ->setClient($this->getClient($sale->client ?? null))
@@ -115,12 +119,14 @@ class SunatService
             ->setDetails($this->getDetails($data['items']))
             ->setObservacion($data['additionalInfo'] ?? null)
             ->setLegends($this->getLegends($data['legends']));
-             $documentDiscounts = $data['discounts'] ?? [];
-            if (!empty($documentDiscounts)) {
-                $invoice->setDescuentos($this->mapDiscountsToCharges($documentDiscounts));
-            }
+        $documentDiscounts = $data['discounts'] ?? [];
+        if (! empty($documentDiscounts)) {
+            $invoice->setDescuentos($this->mapDiscountsToCharges($documentDiscounts));
+        }
+
         return $invoice;
     }
+
     public function getNote(array $data, SaleDocument $sale): Note
     {
         $affectedDocNumber = null;
@@ -128,10 +134,10 @@ class SunatService
         $affectedCorrelative = (string) ($data['affectedCorrelative'] ?? '');
 
         if ($affectedSerie !== '' && $affectedCorrelative !== '') {
-            $affectedDocNumber = $affectedSerie . '-' . $affectedCorrelative;
+            $affectedDocNumber = $affectedSerie.'-'.$affectedCorrelative;
         }
 
-        return (new Note())
+        return (new Note)
             ->setUblVersion($data['ublVersion'] ?? '2.1')
             ->setTipoDoc($data['docSunatType'] ?? null) // Nota de crédito (07) / Nota de débito (08)
             ->setSerie($data['serie'] ?? null)
@@ -160,28 +166,31 @@ class SunatService
             ->setDetails($this->getDetails($data['items']))
             ->setLegends($this->getLegends($data['legends']));
     }
+
     public function getCompany(CompanyModels $company)
     {
-        return (new Company())
+        return (new Company)
             ->setRuc($company->ruc ?? null)
             ->setRazonSocial($company->company_name ?? null)
             ->setNombreComercial($company->company_name ?? null)
             ->setAddress($this->getAddress($company) ?? null);
     }
+
     public function getClient(?ClientModels $client = null): Client
     {
-        $address = (new Address())
-        ->setDireccion(
-            $client?->address
-            ?? null
-        );
+        $address = (new Address)
+            ->setDireccion(
+                $client?->address
+                ?? null
+            );
         if ($client === null) {
-            return (new Client())
+            return (new Client)
                 ->setTipoDoc(DocIdentityType::DNI->value)
                 ->setNumDoc('00000000')
                 ->setRznSocial('CLIENTE-VARIOS');
         }
-        return (new Client())
+
+        return (new Client)
             ->setTipoDoc($client->doc_identity_type->value ?? DocIdentityType::DNI->value)
             ->setNumDoc($client->document_number ?? '00000000')
             ->setRznSocial($client->name ?? $client->trade_name ?? 'CLIENTE-VARIOS')
@@ -189,10 +198,9 @@ class SunatService
             ->setTelephone($client->telephone ?? null);
     }
 
-
     public function getAddress(CompanyModels $company)
     {
-        return (new Address())
+        return (new Address)
             ->setUbigueo($company->ubigueo ?? null)
             ->setDepartamento($company->department ?? null)
             ->setProvincia($company->province ?? null)
@@ -201,6 +209,7 @@ class SunatService
             ->setDireccion($company->address ?? null)
             ->setCodLocal($company->cod_local ?? null); // Codigo de establecimiento asignado por SUNAT, 0000 por defecto.
     }
+
     public function getDetails(array $details): array
     {
         $greenDetails = [];
@@ -209,7 +218,7 @@ class SunatService
             $precioUnitarioOperacion = $discountAmount > 0
                 ? (float) ($detail['unitPriceWithDiscount'] ?? $detail['unitPrice'] ?? 0)
                 : (float) ($detail['unitPrice'] ?? 0);
-            $saleDetail = (new SaleDetail())
+            $saleDetail = (new SaleDetail)
                 ->setCodProducto((string) ($detail['code'] ?? '00000'))
                 ->setUnidad((string) ($detail['unit'] ?? 'NIU'))
                 ->setCantidad((float) ($detail['quantity'] ?? 1))
@@ -235,24 +244,28 @@ class SunatService
 
         return $greenDetails;
     }
+
     public function mapDiscountToCharge(array $discount): Charge
     {
         $baseAmount = ($discount['baseAmount'] ?? 0);
         $factorPorcentage = ($discount['factorPorcentage'] ?? 0);
         $discountAmount = ($discount['discountAmount'] ?? 0);
         $factor = $factorPorcentage;
-        return (new Charge())
+
+        return (new Charge)
             ->setCodTipo((string) ($discount['type'] ?? '00'))
             ->setMontoBase($baseAmount)
             ->setFactor($factor)
             ->setMonto($discountAmount);
     }
+
     public function mapDiscountsToCharges(array $discounts): array
     {
         $charges = [];
         foreach ($discounts as $discount) {
             $charges[] = $this->mapDiscountToCharge($discount);
         }
+
         return $charges;
     }
 
@@ -260,59 +273,70 @@ class SunatService
     {
         $green_legends = [];
         foreach ($legends as $legend) {
-            $green_legends[] = (new Legend())
+            $green_legends[] = (new Legend)
                 ->setCode($legend['code'] ?? null) // Monto en letras - Catalog. 52
                 ->setValue($legend['value'] ?? null);
         }
+
         return $green_legends;
     }
+
     public function sunatResponse($result)
     {
         $response['success'] = $result->isSuccess();
         // Verificamos que la conexión con SUNAT fue exitosa.
-        if (!$response['success']) {
+        if (! $response['success']) {
             $response['error'] = [
                 'code' => $result->getError()->getCode(),
-                'message' => $result->getError()->getMessage()
+                'message' => $result->getError()->getMessage(),
             ];
+
             return $response;
         }
         $response['cdrZip'] = base64_encode($result->getCdrZip());
         $cdr = $result->getCdrResponse();
         $response['cdrResponse'] = [
-            'code' => (int)$cdr->getCode(),
+            'code' => (int) $cdr->getCode(),
             'description' => $cdr->getDescription(),
-            'notes' => $cdr->getNotes()
+            'notes' => $cdr->getNotes(),
         ];
+
         return $response;
     }
 
-    public function getHtmlReport(\Greenter\Model\DocumentInterface $document, ?CompanyModels $company = null, ?string $hash = null): string
+    public function getHtmlReport(DocumentInterface $document, ?CompanyModels $company = null, ?string $hash = null): string
     {
         $report = new HtmlReport(resource_path('templates'));
-        $resolver = new DefaultTemplateResolver();
+        $resolver = new DefaultTemplateResolver;
         $report->setTemplate($resolver->getTemplate($document));
         $additionalInfo = $document instanceof Invoice ? $document->getObservacion() : null;
+
         return $report->render($document, $this->reportParams($company, $hash, $additionalInfo));
     }
-    public function generatePdfReport(\Greenter\Model\DocumentInterface $document, ?CompanyModels $company = null, ?string $hash = null): string
+
+    public function generatePdfReport(DocumentInterface $document, ?CompanyModels $company = null, ?string $hash = null): string
     {
         $htmlReport = new HtmlReport(resource_path('templates'));
-        $resolver = new DefaultTemplateResolver();
+        $resolver = new DefaultTemplateResolver;
         $htmlReport->setTemplate($resolver->getTemplate($document));
         $report = new PdfReport($htmlReport);
-        $report->setOptions( [
+        $report->setOptions([
             'no-outline',
             'viewport-size' => '1280x1024',
             'page-width' => '21cm',
             'page-height' => '29.7cm',
         ]);
-        $report->setBinPath(env('WKHTML_PDF_PATH'));
+        $report->setBinPath(config('services.wkhtmltopdf.binary'));
         $additionalInfo = $document instanceof Invoice ? $document->getObservacion() : null;
         $pdf = $report->render($document, $this->reportParams($company, $hash, $additionalInfo));
 
         if ($pdf === null) {
-            throw new \RuntimeException('No se pudo generar el PDF. Verifique `WKHTML_PDF_PATH` y que wkhtmltopdf este instalado.');
+            $wkhtmltopdfError = trim((string) $report->getExporter()?->getError());
+            $errorDetail = $wkhtmltopdfError !== '' ? " Detalle: {$wkhtmltopdfError}" : '';
+
+            throw new \RuntimeException(
+                'No se pudo generar el PDF. Verifique `WKHTML_PDF_PATH` y que wkhtmltopdf este instalado.'.$errorDetail
+            );
         }
 
         return $pdf;
@@ -331,6 +355,7 @@ class SunatService
                 $logo = file_get_contents($logoPath);
             }
         }
+
         return [
             'system' => [
                 'logo' => $logo,
@@ -349,6 +374,7 @@ class SunatService
             ],
         ];
     }
+
     public function setLegends(&$data)
     {
         $formatter = new NumeroALetras;

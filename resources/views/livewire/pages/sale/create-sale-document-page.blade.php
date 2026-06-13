@@ -394,6 +394,7 @@
     <x-sale.pdf-preview-modal
         :open="$pdfPreviewOpen"
         :url="$pdfPreviewUrl"
+        :status-url="$pdfStatusUrl"
         :new-label="$newLabel"
         new-action="startNewDocument"
         list-action="goToVouchers"

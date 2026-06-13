@@ -2,6 +2,8 @@
 
 namespace App\Actions\Sales;
 
+use App\Models\Client;
+use App\Models\Company;
 use App\Models\SaleDocument;
 use App\Services\SunatService;
 use DateTimeInterface;
@@ -26,12 +28,22 @@ class GenerateSaleDocumentPdf
         return "sale-documents/{$sale->id}/{$fingerprint}.pdf";
     }
 
+    public function exists(SaleDocument $sale): bool
+    {
+        return Storage::disk('local')->exists(self::pathFor($sale));
+    }
+
+    public function get(SaleDocument $sale): string
+    {
+        return Storage::disk('local')->get(self::pathFor($sale));
+    }
+
     public function handle(SaleDocument $sale): string
     {
         $path = self::pathFor($sale);
 
-        if (Storage::disk('local')->exists($path)) {
-            return Storage::disk('local')->get($path);
+        if ($this->exists($sale)) {
+            return $this->get($sale);
         }
 
         $data = $sale->toArray();
@@ -56,5 +68,39 @@ class GenerateSaleDocumentPdf
         Storage::disk('local')->put($path, $pdf);
 
         return $pdf;
+    }
+
+    public function handleSnapshot(array $snapshot): string
+    {
+        $sale = $this->saleFromSnapshot($snapshot);
+
+        $path = self::pathFor($sale);
+
+        if ($this->exists($sale)) {
+            return $this->get($sale);
+        }
+
+        $data = $snapshot['data'];
+        $this->sunatService->setLegends($data);
+        $document = $this->sunatService->getDocument($data, $sale);
+        $pdf = $this->sunatService->generatePdfReport($document, company: $sale->company, hash: $sale->hash);
+
+        Storage::disk('local')->put($path, $pdf);
+
+        return $pdf;
+    }
+
+    public function saleFromSnapshot(array $snapshot): SaleDocument
+    {
+        $sale = (new SaleDocument)->newFromBuilder($snapshot['sale']);
+        $sale->setRelation('company', (new Company)->newFromBuilder($snapshot['company']));
+        $sale->setRelation(
+            'client',
+            is_array($snapshot['client'] ?? null)
+                ? (new Client)->newFromBuilder($snapshot['client'])
+                : null,
+        );
+
+        return $sale;
     }
 }

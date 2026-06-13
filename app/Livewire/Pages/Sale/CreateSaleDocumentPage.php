@@ -6,6 +6,7 @@ use App\Enums\DocumentStatus;
 use App\Enums\Sunat\CreditNoteReasonType;
 use App\Enums\Sunat\DiscountType;
 use App\Enums\Sunat\DocSunatType;
+use App\Jobs\GenerateSaleDocumentPdfJob;
 use App\Livewire\Forms\ClientForm;
 use App\Livewire\Forms\DiscountForm;
 use App\Livewire\Forms\SaleForm;
@@ -49,6 +50,8 @@ class CreateSaleDocumentPage extends Component
     public bool $pdfPreviewOpen = false;
 
     public ?string $pdfPreviewUrl = null;
+
+    public ?string $pdfStatusUrl = null;
 
     public ?string $savedSaleId = null;
 
@@ -521,22 +524,24 @@ class CreateSaleDocumentPage extends Component
         }
     }
 
-    public function openPdfPreview(?string $url = null): void
+    public function openPdfPreview(?string $url = null, ?string $statusUrl = null): void
     {
         $this->pdfPreviewUrl = filled($url) ? $url : null;
-        $this->pdfPreviewOpen = filled($this->pdfPreviewUrl);
+        $this->pdfStatusUrl = filled($statusUrl) ? $statusUrl : null;
+        $this->pdfPreviewOpen = filled($this->pdfPreviewUrl) || filled($this->pdfStatusUrl);
     }
 
     public function closePdfPreview(): void
     {
         $this->pdfPreviewOpen = false;
         $this->pdfPreviewUrl = null;
+        $this->pdfStatusUrl = null;
+        $this->resetForm();
     }
 
     public function startNewDocument(): void
     {
         $this->closePdfPreview();
-        $this->resetForm();
     }
 
     public function goToVouchers(): void
@@ -582,12 +587,6 @@ class CreateSaleDocumentPage extends Component
                 'label' => $label,
             ],
         ];
-    }
-
-    #[On('pdf-modal-closed')]
-    public function resetFromModal(): void
-    {
-        $this->resetForm();
     }
 
     public function save(SerieService $serieService): void
@@ -655,7 +654,14 @@ class CreateSaleDocumentPage extends Component
             );
 
             $this->savedSaleId = $result['saleId'];
-            $this->openPdfPreview($result['pdfUrl'] ?? null);
+            GenerateSaleDocumentPdfJob::dispatch(
+                $this->savedSaleId,
+                $result['pdfSnapshotPath'] ?? null,
+            );
+            $this->openPdfPreview(
+                $result['pdfUrl'] ?? null,
+                route('sale.pdf-status', $this->savedSaleId),
+            );
             Flux::modal('confirm')->show();
         } catch (\Throwable $th) {
             Flux::toast(
