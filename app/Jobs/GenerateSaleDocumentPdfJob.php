@@ -5,10 +5,12 @@ namespace App\Jobs;
 use App\Actions\Sales\GenerateSaleDocumentPdf;
 use App\Models\SaleDocument;
 use App\Services\CompanyCache;
+use App\Services\SaleDocumentPdfSnapshot;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class GenerateSaleDocumentPdfJob implements ShouldBeUnique, ShouldQueue
@@ -23,8 +25,10 @@ class GenerateSaleDocumentPdfJob implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 300;
 
-    public function __construct(public string $saleId)
-    {
+    public function __construct(
+        public string $saleId,
+        public ?string $snapshotPath = null,
+    ) {
         Cache::forget(self::failureCacheKey($this->saleId));
         $this->afterCommit();
     }
@@ -37,8 +41,16 @@ class GenerateSaleDocumentPdfJob implements ShouldBeUnique, ShouldQueue
     public function handle(
         GenerateSaleDocumentPdf $generatePdf,
         CompanyCache $companyCache,
+        SaleDocumentPdfSnapshot $pdfSnapshot,
     ): void {
         Cache::forget(self::failureCacheKey($this->saleId));
+
+        if (filled($this->snapshotPath) && Storage::disk('local')->exists($this->snapshotPath)) {
+            $snapshot = $pdfSnapshot->get($this->snapshotPath);
+            $generatePdf->handleSnapshot($snapshot);
+
+            return;
+        }
 
         $sale = SaleDocument::query()
             ->with(['items', 'client', 'items.discounts'])

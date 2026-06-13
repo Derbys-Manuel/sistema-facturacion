@@ -9,15 +9,16 @@
     'listAction' => 'goToVouchers',
     'listLabel' => 'Ir a listado',
     'showFooterActions' => true,
-    'closedEvent' => 'pdf-modal-closed',
 ])
 
 @if ($open)
     <div
+        x-show="visible"
+        x-cloak
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
         x-data="{
+            visible: true,
             leaving: false,
-            closing: false,
             pdfUrl: null,
             pdfStatus: '{{ filled($statusUrl) ? 'pending' : (filled($url) ? 'ready' : 'failed') }}',
             pdfError: null,
@@ -76,7 +77,7 @@
 
             closeModal() {
                 clearTimeout(this.pollTimer);
-                this.$dispatch('{{ $closedEvent }}');
+                this.visible = false;
                 $wire.{{ $closeAction }}();
             }
         }"
@@ -94,17 +95,9 @@
                     variant="ghost"
                     size="sm"
                     type="button"
-                    x-on:click="closing = true; closeModal()"
-                    x-bind:disabled="closing"
+                    x-on:click="closeModal()"
                 >
-                    <span x-show="!closing" x-cloak>
-                        Cerrar
-                    </span>
-
-                    <span x-show="closing" x-cloak class="inline-flex items-center gap-2">
-                        <flux:icon.loading class="size-4 animate-spin" />
-                        <span>Cerrando...</span>
-                    </span>
+                    Cerrar
                 </x-form.button>
             </div>
 

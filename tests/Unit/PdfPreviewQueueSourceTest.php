@@ -17,10 +17,11 @@ it('dispatches pdf generation from creation and vouchers', function (): void {
     $vouchers = file_get_contents(dirname(__DIR__, 2).'/resources/views/pages/sale/⚡vouchers.blade.php');
 
     expect($createPage)
-        ->toContain('GenerateSaleDocumentPdfJob::dispatch')
+        ->toContain("GenerateSaleDocumentPdfJob::dispatch(\n                \$this->savedSaleId,\n                \$result['pdfSnapshotPath']")
         ->toContain("route('sale.pdf-status'");
 
     expect($vouchers)
-        ->toContain('GenerateSaleDocumentPdfJob::dispatch')
+        ->toContain('$snapshotPath = $pdfSnapshot->storeFromDatabase($saleId)')
+        ->toContain('GenerateSaleDocumentPdfJob::dispatch($saleId, $snapshotPath)')
         ->toContain("route('sale.pdf-status'");
 });

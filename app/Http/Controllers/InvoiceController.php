@@ -6,6 +6,7 @@ use App\Actions\Sales\GenerateSaleDocumentPdf;
 use App\Jobs\GenerateSaleDocumentPdfJob;
 use App\Models\SaleDocument;
 use App\Services\CompanyCache;
+use App\Services\SaleDocumentPdfSnapshot;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
@@ -16,12 +17,17 @@ class InvoiceController extends Controller
         string $saleId,
         GenerateSaleDocumentPdf $generatePdf,
         CompanyCache $companyCache,
+        SaleDocumentPdfSnapshot $pdfSnapshot,
     ): Response {
-        $sale = SaleDocument::query()
-            ->with(['items', 'client', 'items.discounts'])
-            ->findOrFail($saleId);
+        if ($pdfSnapshot->exists($saleId)) {
+            $sale = $generatePdf->saleFromSnapshot($pdfSnapshot->getForSale($saleId));
+        } else {
+            $sale = SaleDocument::query()
+                ->with(['items', 'client', 'items.discounts'])
+                ->findOrFail($saleId);
 
-        $sale->setRelation('company', $companyCache->findOrFail((string) $sale->company_id));
+            $sale->setRelation('company', $companyCache->findOrFail((string) $sale->company_id));
+        }
 
         abort_unless($generatePdf->exists($sale), 404, 'El PDF todavía no está disponible.');
 
@@ -37,8 +43,11 @@ class InvoiceController extends Controller
     public function pdfStatus(
         string $saleId,
         GenerateSaleDocumentPdf $generatePdf,
+        SaleDocumentPdfSnapshot $pdfSnapshot,
     ): JsonResponse {
-        $sale = SaleDocument::query()->findOrFail($saleId);
+        $sale = $pdfSnapshot->exists($saleId)
+            ? $generatePdf->saleFromSnapshot($pdfSnapshot->getForSale($saleId))
+            : SaleDocument::query()->findOrFail($saleId);
 
         if ($generatePdf->exists($sale)) {
             return response()->json([

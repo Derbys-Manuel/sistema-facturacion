@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\GenerateSaleDocumentPdfJob;
+use App\Services\SaleDocumentPdfSnapshot;
 
 use App\Enums\Sunat\DocSunatType;
 use App\Enums\DocumentStatus;
@@ -162,14 +163,20 @@ new class extends Component
         $this->pdfStatusUrl = null;
     }
 
-    public function previewPdf(?string $saleId = null): void
+    public function previewPdf(
+        ?string $saleId,
+        SaleDocumentPdfSnapshot $pdfSnapshot,
+    ): void
     {
         if (blank($saleId)) {
             $this->openPdfPreview(null);
 
             return;
         }
-        GenerateSaleDocumentPdfJob::dispatch($saleId);
+
+        $snapshotPath = $pdfSnapshot->storeFromDatabase($saleId);
+
+        GenerateSaleDocumentPdfJob::dispatch($saleId, $snapshotPath);
         $this->openPdfPreview(
             route('sale.pdf', $saleId),
             route('sale.pdf-status', $saleId),

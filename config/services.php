@@ -44,4 +44,8 @@ return [
         'sol_pass' => env('PASS_SOL_NEXARA'),
     ],
 
+    'wkhtmltopdf' => [
+        'binary' => env('WKHTML_PDF_PATH'),
+    ],
+
 ];

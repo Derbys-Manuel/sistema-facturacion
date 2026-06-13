@@ -8,6 +8,9 @@ it('generates sale document pdfs in a unique queued job', function (): void {
         ->toContain('ShouldQueue')
         ->toContain('public int $timeout = 180')
         ->toContain('public int $uniqueFor = 300')
+        ->toContain('$pdfSnapshot->get($this->snapshotPath)')
+        ->toContain('$generatePdf->handleSnapshot($snapshot)')
+        ->toContain('if (filled($this->snapshotPath)')
         ->toContain('$generatePdf->handle($sale)')
         ->toContain('public function failed(?Throwable $exception): void');
 });

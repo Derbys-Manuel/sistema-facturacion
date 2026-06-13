@@ -9,6 +9,7 @@ use App\Enums\Sunat\DocSunatType;
 use App\Enums\Sunat\OperationType;
 use App\Enums\Sunat\PaymentForm;
 use App\Models\SaleDocument;
+use App\Services\SaleDocumentPdfSnapshot;
 use App\Services\SerieService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -266,6 +267,7 @@ class SaleForm extends Form
         return [
             'saleId' => (string) $sale->id,
             'pdfUrl' => route('sale.pdf', $sale->id),
+            'pdfSnapshotPath' => app(SaleDocumentPdfSnapshot::class)->store($sale, $data),
         ];
     }
 
@@ -345,9 +347,25 @@ class SaleForm extends Form
             return $sale;
         });
 
+        $data['serie'] = (string) ($sale->serie ?? '');
+        $data['correlative'] = (string) ($sale->correlative ?? '');
+        $data['items'] = collect($data['items'] ?? [])
+            ->map(function ($item) {
+                if (is_array($item)) {
+                    $item['discounts'] = collect($item['discounts'] ?? [])
+                        ->filter(fn ($discount) => (float) ($discount['discountAmount'] ?? 0) > 0)
+                        ->values()
+                        ->all();
+                }
+
+                return $item;
+            })
+            ->all();
+
         return [
             'saleId' => (string) $sale->id,
             'pdfUrl' => route('sale.pdf', $sale->id),
+            'pdfSnapshotPath' => app(SaleDocumentPdfSnapshot::class)->store($sale, $data),
         ];
     }
 

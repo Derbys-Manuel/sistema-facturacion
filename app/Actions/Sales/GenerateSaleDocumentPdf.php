@@ -2,6 +2,8 @@
 
 namespace App\Actions\Sales;
 
+use App\Models\Client;
+use App\Models\Company;
 use App\Models\SaleDocument;
 use App\Services\SunatService;
 use DateTimeInterface;
@@ -66,5 +68,39 @@ class GenerateSaleDocumentPdf
         Storage::disk('local')->put($path, $pdf);
 
         return $pdf;
+    }
+
+    public function handleSnapshot(array $snapshot): string
+    {
+        $sale = $this->saleFromSnapshot($snapshot);
+
+        $path = self::pathFor($sale);
+
+        if ($this->exists($sale)) {
+            return $this->get($sale);
+        }
+
+        $data = $snapshot['data'];
+        $this->sunatService->setLegends($data);
+        $document = $this->sunatService->getDocument($data, $sale);
+        $pdf = $this->sunatService->generatePdfReport($document, company: $sale->company, hash: $sale->hash);
+
+        Storage::disk('local')->put($path, $pdf);
+
+        return $pdf;
+    }
+
+    public function saleFromSnapshot(array $snapshot): SaleDocument
+    {
+        $sale = (new SaleDocument)->newFromBuilder($snapshot['sale']);
+        $sale->setRelation('company', (new Company)->newFromBuilder($snapshot['company']));
+        $sale->setRelation(
+            'client',
+            is_array($snapshot['client'] ?? null)
+                ? (new Client)->newFromBuilder($snapshot['client'])
+                : null,
+        );
+
+        return $sale;
     }
 }

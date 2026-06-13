@@ -536,12 +536,12 @@ class CreateSaleDocumentPage extends Component
         $this->pdfPreviewOpen = false;
         $this->pdfPreviewUrl = null;
         $this->pdfStatusUrl = null;
+        $this->resetForm();
     }
 
     public function startNewDocument(): void
     {
         $this->closePdfPreview();
-        $this->resetForm();
     }
 
     public function goToVouchers(): void
@@ -587,12 +587,6 @@ class CreateSaleDocumentPage extends Component
                 'label' => $label,
             ],
         ];
-    }
-
-    #[On('pdf-modal-closed')]
-    public function resetFromModal(): void
-    {
-        $this->resetForm();
     }
 
     public function save(SerieService $serieService): void
@@ -660,7 +654,10 @@ class CreateSaleDocumentPage extends Component
             );
 
             $this->savedSaleId = $result['saleId'];
-            GenerateSaleDocumentPdfJob::dispatch($this->savedSaleId);
+            GenerateSaleDocumentPdfJob::dispatch(
+                $this->savedSaleId,
+                $result['pdfSnapshotPath'] ?? null,
+            );
             $this->openPdfPreview(
                 $result['pdfUrl'] ?? null,
                 route('sale.pdf-status', $this->savedSaleId),
